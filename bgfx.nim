@@ -6,6 +6,7 @@
 ##  https://gist.github.com/bkaradzic/05a1c86a6dd57bf86e2d828878e88dc2#bgfx-is-switching-to-idl-to-generate-api
 ##
 ##
+type va_list* {.importc,header:"<stdarg.h>".} = object
 
 {.deadCodeElim: on.}
 when defined(windows):
@@ -357,17 +358,12 @@ type
 
 type
   bgfx_allocator_vtbl_t* {.bycopy.} = object
-    realloc*: proc (_this: ptr bgfx_allocator_interface_t; _ptr: pointer;
-                  _size: csize_t; _align: csize_t; _file: cstring; _line: uint32): pointer {.
+    realloc*: proc (this: ptr bgfx_allocator_interface_t; p: pointer;
+                  size: csize_t; align: csize_t; file: cstring; line: uint32): pointer {.
         cdecl.}
 
-
-
 type
-  bgfx_interface_vtbl_t* = bgfx_interface_vtbl
-
-
-type
+  bgfx_callback_vtbl_s {.bycopy.} = object
   bgfx_callback_interface_t* {.bycopy.} = object
     vtbl*: ptr bgfx_callback_vtbl_s
 
@@ -375,31 +371,31 @@ type
 
 type
   bgfx_callback_vtbl_t* {.bycopy.} = object
-    fatal*: proc (_this: ptr bgfx_callback_interface_t; _filePath: cstring;
-                _line: uint16; _code: bgfx_fatal_t; _str: cstring) {.cdecl.}
-    trace_vargs*: proc (_this: ptr bgfx_callback_interface_t; _filePath: cstring;
-                      _line: uint16; _format: cstring; _argList: va_list) {.cdecl.}
-    profiler_begin*: proc (_this: ptr bgfx_callback_interface_t; _name: cstring;
-                         _abgr: uint32; _filePath: cstring; _line: uint16) {.cdecl.}
-    profiler_begin_literal*: proc (_this: ptr bgfx_callback_interface_t;
-                                 _name: cstring; _abgr: uint32;
-                                 _filePath: cstring; _line: uint16) {.cdecl.}
-    profiler_end*: proc (_this: ptr bgfx_callback_interface_t) {.cdecl.}
-    cache_read_size*: proc (_this: ptr bgfx_callback_interface_t; _id: uint64): uint32 {.
+    fatal*: proc (this: ptr bgfx_callback_interface_t; filePath: cstring;
+                line: uint16; code: bgfx_fatal_t; str: cstring) {.cdecl.}
+    trace_vargs*: proc (this: ptr bgfx_callback_interface_t; filePath: cstring;
+                      line: uint16; format: cstring; argList: va_list) {.cdecl.}
+    profiler_begin*: proc (this: ptr bgfx_callback_interface_t; name: cstring;
+                         abgr: uint32; filePath: cstring; line: uint16) {.cdecl.}
+    profiler_begin_literal*: proc (this: ptr bgfx_callback_interface_t;
+                                 name: cstring; abgr: uint32;
+                                 filePath: cstring; line: uint16) {.cdecl.}
+    profiler_end*: proc (this: ptr bgfx_callback_interface_t) {.cdecl.}
+    cache_read_size*: proc (this: ptr bgfx_callback_interface_t; id: uint64): uint32 {.
         cdecl.}
-    cache_read*: proc (_this: ptr bgfx_callback_interface_t; _id: uint64;
-                     _data: pointer; _size: uint32): bool {.cdecl.}
-    cache_write*: proc (_this: ptr bgfx_callback_interface_t; _id: uint64;
-                      _data: pointer; _size: uint32) {.cdecl.}
-    screen_shot*: proc (_this: ptr bgfx_callback_interface_t; _filePath: cstring;
-                      _width: uint32; _height: uint32; _pitch: uint32;
-                      _data: pointer; _size: uint32; _yflip: bool) {.cdecl.}
-    capture_begin*: proc (_this: ptr bgfx_callback_interface_t; _width: uint32;
-                        _height: uint32; _pitch: uint32;
-                        _format: bgfx_texture_format_t; _yflip: bool) {.cdecl.}
-    capture_end*: proc (_this: ptr bgfx_callback_interface_t) {.cdecl.}
-    capture_frame*: proc (_this: ptr bgfx_callback_interface_t; _data: pointer;
-                        _size: uint32) {.cdecl.}
+    cache_read*: proc (this: ptr bgfx_callback_interface_t; id: uint64;
+                     data: pointer; size: uint32): bool {.cdecl.}
+    cache_write*: proc (this: ptr bgfx_callback_interface_t; id: uint64;
+                      data: pointer; size: uint32) {.cdecl.}
+    screen_shot*: proc (this: ptr bgfx_callback_interface_t; filePath: cstring;
+                      width: uint32; height: uint32; pitch: uint32;
+                      data: pointer; size: uint32; yflip: bool) {.cdecl.}
+    capture_begin*: proc (this: ptr bgfx_callback_interface_t; width: uint32;
+                        height: uint32; pitch: uint32;
+                        format: bgfx_texture_format_t; yflip: bool) {.cdecl.}
+    capture_end*: proc (this: ptr bgfx_callback_interface_t) {.cdecl.}
+    capture_frame*: proc (this: ptr bgfx_callback_interface_t; data: pointer;
+                        size: uint32) {.cdecl.}
 
   bgfx_dynamic_index_buffer_handle_t* {.bycopy.} = object
     idx*: uint16
@@ -444,13 +440,13 @@ template BGFX_HANDLE_IS_VALID*(h: untyped): untyped =
 ## *
 ##  Memory release callback.
 ##
-##  @param[in] _ptr Pointer to allocated data.
-##  @param[in] _userData User defined data if needed.
+##  @param[in] p Pointer to allocated data.
+##  @param[in] userData User defined data if needed.
 ##
 ##
 
 type
-  bgfx_release_fn_t* = proc (_ptr: pointer; _userData: pointer) {.cdecl.}
+  bgfx_release_fn_t* = proc (p: pointer; userData: pointer) {.cdecl.}
 
 ## *
 ##  GPU info.
@@ -776,10 +772,10 @@ type
   bgfx_view_stats_t* {.bycopy.} = object
     name*: array[256, char]     ## * View name.
     view*: bgfx_view_id_t      ## * View id.
-    cpuTimeBegin*: int64_t     ## * CPU (submit) begin time.
-    cpuTimeEnd*: int64_t       ## * CPU (submit) end time.
-    gpuTimeBegin*: int64_t     ## * GPU begin time.
-    gpuTimeEnd*: int64_t       ## * GPU end time.
+    cpuTimeBegin*: int64     ## * CPU (submit) begin time.
+    cpuTimeEnd*: int64       ## * CPU (submit) end time.
+    gpuTimeBegin*: int64     ## * GPU begin time.
+    gpuTimeEnd*: int64       ## * GPU end time.
 
 
 ## *
@@ -789,8 +785,8 @@ type
 
 type
   bgfx_encoder_stats_t* {.bycopy.} = object
-    cpuTimeBegin*: int64_t     ## * Encoder thread CPU submit begin time.
-    cpuTimeEnd*: int64_t       ## * Encoder thread CPU submit end time.
+    cpuTimeBegin*: int64     ## * Encoder thread CPU submit begin time.
+    cpuTimeEnd*: int64       ## * Encoder thread CPU submit end time.
 
 
 ## *
@@ -802,15 +798,15 @@ type
 
 type
   bgfx_stats_t* {.bycopy.} = object
-    cpuTimeFrame*: int64_t     ## * CPU time between two `bgfx::frame` calls.
-    cpuTimeBegin*: int64_t     ## * Render thread CPU submit begin time.
-    cpuTimeEnd*: int64_t       ## * Render thread CPU submit end time.
-    cpuTimerFreq*: int64_t     ## * CPU timer frequency. Timestamps-per-second
-    gpuTimeBegin*: int64_t     ## * GPU frame begin time.
-    gpuTimeEnd*: int64_t       ## * GPU frame end time.
-    gpuTimerFreq*: int64_t     ## * GPU timer frequency.
-    waitRender*: int64_t       ## * Time spent waiting for render backend thread to finish issuing draw commands to underlying graphics API.
-    waitSubmit*: int64_t       ## * Time spent waiting for submit thread to advance to next frame.
+    cpuTimeFrame*: int64     ## * CPU time between two `bgfx::frame` calls.
+    cpuTimeBegin*: int64     ## * Render thread CPU submit begin time.
+    cpuTimeEnd*: int64       ## * Render thread CPU submit end time.
+    cpuTimerFreq*: int64     ## * CPU timer frequency. Timestamps-per-second
+    gpuTimeBegin*: int64     ## * GPU frame begin time.
+    gpuTimeEnd*: int64       ## * GPU frame end time.
+    gpuTimerFreq*: int64     ## * GPU timer frequency.
+    waitRender*: int64       ## * Time spent waiting for render backend thread to finish issuing draw commands to underlying graphics API.
+    waitSubmit*: int64       ## * Time spent waiting for submit thread to advance to next frame.
     numDraw*: uint32         ## * Number of draw calls submitted.
     numCompute*: uint32      ## * Number of compute calls submitted.
     numBlit*: uint32         ## * Number of blit calls submitted.
@@ -826,13 +822,13 @@ type
     numUniforms*: uint16     ## * Number of used uniforms.
     numVertexBuffers*: uint16 ## * Number of used vertex buffers.
     numVertexLayouts*: uint16 ## * Number of used vertex layouts.
-    textureMemoryUsed*: int64_t ## * Estimate of texture memory used.
-    rtMemoryUsed*: int64_t     ## * Estimate of render target memory used.
-    transientVbUsed*: int32_t  ## * Amount of transient vertex buffer used.
-    transientIbUsed*: int32_t  ## * Amount of transient index buffer used.
+    textureMemoryUsed*: int64 ## * Estimate of texture memory used.
+    rtMemoryUsed*: int64     ## * Estimate of render target memory used.
+    transientVbUsed*: int32  ## * Amount of transient vertex buffer used.
+    transientIbUsed*: int32  ## * Amount of transient index buffer used.
     numPrims*: array[BGFX_TOPOLOGY_COUNT, uint32] ## * Number of primitives rendered.
-    gpuMemoryMax*: int64_t     ## * Maximum available GPU memory for application.
-    gpuMemoryUsed*: int64_t    ## * Amount of GPU memory used by the application.
+    gpuMemoryMax*: int64     ## * Maximum available GPU memory for application.
+    gpuMemoryUsed*: int64    ## * Amount of GPU memory used by the application.
     width*: uint16           ## * Backbuffer width in pixels.
     height*: uint16          ## * Backbuffer height in pixels.
     textWidth*: uint16       ## * Debug text width in characters.
@@ -879,10 +875,10 @@ type
 ##
 ##
 
-proc bgfx_attachment_init*(_this: ptr bgfx_attachment_t;
-                          _handle: bgfx_texture_handle_t; _access: bgfx_access_t;
-                          _layer: uint16; _numLayers: uint16; _mip: uint16;
-                          _resolve: uint8) {.cdecl,
+proc bgfx_attachment_init*(this: ptr bgfx_attachment_t;
+                          handle: bgfx_texture_handle_t; access: bgfx_access_t;
+                          layer: uint16; numLayers: uint16; mip: uint16;
+                          resolve: uint8) {.cdecl,
     importc: "bgfx_attachment_init", dynlib: bgfxdll.}
 ## *
 ##  Start VertexLayout.
@@ -893,17 +889,17 @@ proc bgfx_attachment_init*(_this: ptr bgfx_attachment_t;
 ##
 ##
 
-proc bgfx_vertex_layout_begin*(_this: ptr bgfx_vertex_layout_t;
-                              _rendererType: bgfx_renderer_type_t): ptr bgfx_vertex_layout_t {.
+proc bgfx_vertex_layout_begin*(this: ptr bgfx_vertex_layout_t;
+                              rendererType: bgfx_renderer_type_t): ptr bgfx_vertex_layout_t {.
     cdecl, importc: "bgfx_vertex_layout_begin", dynlib: bgfxdll.}
 ## *
 ##  Add attribute to VertexLayout.
 ##  @remarks Must be called between begin/end.
 ##
-##  @param[in] _attrib Attribute semantics. See: `bgfx::Attrib`
-##  @param[in] _num Number of elements 1, 2, 3 or 4.
-##  @param[in] _type Element type.
-##  @param[in] _normalized When using fixed point AttribType (f.e. Uint8)
+##  @param[in] attrib Attribute semantics. See: `bgfx::Attrib`
+##  @param[in] num Number of elements 1, 2, 3 or 4.
+##  @param[in] type Element type.
+##  @param[in] normalized When using fixed point AttribType (f.e. Uint8)
 ##   value will be normalized for vertex shader usage. When normalized
 ##   is set to true, AttribType::Uint8 value in range 0-255 will be
 ##   in range 0.0-1.0 in vertex shader.
@@ -915,167 +911,167 @@ proc bgfx_vertex_layout_begin*(_this: ptr bgfx_vertex_layout_t;
 ##
 ##
 
-proc bgfx_vertex_layout_add*(_this: ptr bgfx_vertex_layout_t;
-                            _attrib: bgfx_attrib_t; _num: uint8;
-                            _type: bgfx_attrib_type_t; _normalized: bool;
-                            _asInt: bool): ptr bgfx_vertex_layout_t {.cdecl,
+proc bgfx_vertex_layout_add*(this: ptr bgfx_vertex_layout_t;
+                            attrib: bgfx_attrib_t; num: uint8;
+                            `type`: bgfx_attrib_type_t; normalized: bool;
+                            asInt: bool): ptr bgfx_vertex_layout_t {.cdecl,
     importc: "bgfx_vertex_layout_add", dynlib: bgfxdll.}
 ## *
 ##  Decode attribute.
 ##
-##  @param[in] _attrib Attribute semantics. See: `bgfx::Attrib`
-##  @param[out] _num Number of elements.
-##  @param[out] _type Element type.
-##  @param[out] _normalized Attribute is normalized.
-##  @param[out] _asInt Attribute is packed as int.
+##  @param[in] attrib Attribute semantics. See: `bgfx::Attrib`
+##  @param[out] num Number of elements.
+##  @param[out] type Element type.
+##  @param[out] normalized Attribute is normalized.
+##  @param[out] asInt Attribute is packed as int.
 ##
 ##
 
-proc bgfx_vertex_layout_decode*(_this: ptr bgfx_vertex_layout_t;
-                               _attrib: bgfx_attrib_t; _num: ptr uint8;
-                               _type: ptr bgfx_attrib_type_t;
-                               _normalized: ptr bool; _asInt: ptr bool) {.cdecl,
+proc bgfx_vertex_layout_decode*(this: ptr bgfx_vertex_layout_t;
+                               attrib: bgfx_attrib_t; num: ptr uint8;
+                               `type`: ptr bgfx_attrib_type_t;
+                               normalized: ptr bool; asInt: ptr bool) {.cdecl,
     importc: "bgfx_vertex_layout_decode", dynlib: bgfxdll.}
 ## *
 ##  Returns `true` if VertexLayout contains attribute.
 ##
-##  @param[in] _attrib Attribute semantics. See: `bgfx::Attrib`
+##  @param[in] attrib Attribute semantics. See: `bgfx::Attrib`
 ##
 ##  @returns True if VertexLayout contains attribute.
 ##
 ##
 
-proc bgfx_vertex_layout_has*(_this: ptr bgfx_vertex_layout_t; _attrib: bgfx_attrib_t): bool {.
+proc bgfx_vertex_layout_has*(this: ptr bgfx_vertex_layout_t; attrib: bgfx_attrib_t): bool {.
     cdecl, importc: "bgfx_vertex_layout_has", dynlib: bgfxdll.}
 ## *
 ##  Skip `_num` bytes in vertex stream.
 ##
-##  @param[in] _num Number of bytes to skip.
+##  @param[in] num Number of bytes to skip.
 ##
 ##  @returns Returns itself.
 ##
 ##
 
-proc bgfx_vertex_layout_skip*(_this: ptr bgfx_vertex_layout_t; _num: uint8): ptr bgfx_vertex_layout_t {.
+proc bgfx_vertex_layout_skip*(this: ptr bgfx_vertex_layout_t; num: uint8): ptr bgfx_vertex_layout_t {.
     cdecl, importc: "bgfx_vertex_layout_skip", dynlib: bgfxdll.}
 ## *
 ##  End VertexLayout.
 ##
 ##
 
-proc bgfx_vertex_layout_end*(_this: ptr bgfx_vertex_layout_t) {.cdecl,
+proc bgfx_vertex_layout_end*(this: ptr bgfx_vertex_layout_t) {.cdecl,
     importc: "bgfx_vertex_layout_end", dynlib: bgfxdll.}
 ## *
 ##  Pack vertex attribute into vertex stream format.
 ##
-##  @param[in] _input Value to be packed into vertex stream.
-##  @param[in] _inputNormalized `true` if input value is already normalized.
-##  @param[in] _attr Attribute to pack.
-##  @param[in] _layout Vertex stream layout.
-##  @param[in] _data Destination vertex stream where data will be packed.
-##  @param[in] _index Vertex index that will be modified.
+##  @param[in] input Value to be packed into vertex stream.
+##  @param[in] inputNormalized `true` if input value is already normalized.
+##  @param[in] attr Attribute to pack.
+##  @param[in] layout Vertex stream layout.
+##  @param[in] data Destination vertex stream where data will be packed.
+##  @param[in] index Vertex index that will be modified.
 ##
 ##
 
-proc bgfx_vertex_pack*(_input: array[4, cfloat]; _inputNormalized: bool;
-                      _attr: bgfx_attrib_t; _layout: ptr bgfx_vertex_layout_t;
-                      _data: pointer; _index: uint32) {.cdecl,
+proc bgfx_vertex_pack*(input: array[4, cfloat]; inputNormalized: bool;
+                      attr: bgfx_attrib_t; layout: ptr bgfx_vertex_layout_t;
+                      data: pointer; index: uint32) {.cdecl,
     importc: "bgfx_vertex_pack", dynlib: bgfxdll.}
 ## *
 ##  Unpack vertex attribute from vertex stream format.
 ##
-##  @param[out] _output Result of unpacking.
-##  @param[in] _attr Attribute to unpack.
-##  @param[in] _layout Vertex stream layout.
-##  @param[in] _data Source vertex stream from where data will be unpacked.
-##  @param[in] _index Vertex index that will be unpacked.
+##  @param[out] output Result of unpacking.
+##  @param[in] attr Attribute to unpack.
+##  @param[in] layout Vertex stream layout.
+##  @param[in] data Source vertex stream from where data will be unpacked.
+##  @param[in] index Vertex index that will be unpacked.
 ##
 ##
 
-proc bgfx_vertex_unpack*(_output: array[4, cfloat]; _attr: bgfx_attrib_t;
-                        _layout: ptr bgfx_vertex_layout_t; _data: pointer;
-                        _index: uint32) {.cdecl, importc: "bgfx_vertex_unpack",
+proc bgfx_vertex_unpack*(output: array[4, cfloat]; attr: bgfx_attrib_t;
+                        layout: ptr bgfx_vertex_layout_t; data: pointer;
+                        index: uint32) {.cdecl, importc: "bgfx_vertex_unpack",
     dynlib: bgfxdll.}
 ## *
 ##  Converts vertex stream data from one vertex stream format to another.
 ##
-##  @param[in] _dstLayout Destination vertex stream layout.
-##  @param[in] _dstData Destination vertex stream.
-##  @param[in] _srcLayout Source vertex stream layout.
-##  @param[in] _srcData Source vertex stream data.
-##  @param[in] _num Number of vertices to convert from source to destination.
+##  @param[in] dstLayout Destination vertex stream layout.
+##  @param[in] dstData Destination vertex stream.
+##  @param[in] srcLayout Source vertex stream layout.
+##  @param[in] srcData Source vertex stream data.
+##  @param[in] num Number of vertices to convert from source to destination.
 ##
 ##
 
-proc bgfx_vertex_convert*(_dstLayout: ptr bgfx_vertex_layout_t; _dstData: pointer;
-                         _srcLayout: ptr bgfx_vertex_layout_t; _srcData: pointer;
-                         _num: uint32) {.cdecl, importc: "bgfx_vertex_convert",
+proc bgfx_vertex_convert*(dstLayout: ptr bgfx_vertex_layout_t; dstData: pointer;
+                         srcLayout: ptr bgfx_vertex_layout_t; srcData: pointer;
+                         num: uint32) {.cdecl, importc: "bgfx_vertex_convert",
     dynlib: bgfxdll.}
 ## *
 ##  Weld vertices.
 ##
-##  @param[in] _output Welded vertices remapping table. The size of buffer
+##  @param[in] output Welded vertices remapping table. The size of buffer
 ##   must be the same as number of vertices.
-##  @param[in] _layout Vertex stream layout.
-##  @param[in] _data Vertex stream.
-##  @param[in] _num Number of vertices in vertex stream.
-##  @param[in] _index32 Set to `true` if input indices are 32-bit.
-##  @param[in] _epsilon Error tolerance for vertex position comparison.
+##  @param[in] layout Vertex stream layout.
+##  @param[in] data Vertex stream.
+##  @param[in] num Number of vertices in vertex stream.
+##  @param[in] index32 Set to `true` if input indices are 32-bit.
+##  @param[in] epsilon Error tolerance for vertex position comparison.
 ##
 ##  @returns Number of unique vertices after vertex welding.
 ##
 ##
 
-proc bgfx_weld_vertices*(_output: pointer; _layout: ptr bgfx_vertex_layout_t;
-                        _data: pointer; _num: uint32; _index32: bool;
-                        _epsilon: cfloat): uint32 {.cdecl,
+proc bgfx_weld_vertices*(output: pointer; layout: ptr bgfx_vertex_layout_t;
+                        data: pointer; num: uint32; index32: bool;
+                        epsilon: cfloat): uint32 {.cdecl,
     importc: "bgfx_weld_vertices", dynlib: bgfxdll.}
 ## *
 ##  Convert index buffer for use with different primitive topologies.
 ##
-##  @param[in] _conversion Conversion type, see `TopologyConvert::Enum`.
-##  @param[out] _dst Destination index buffer. If this argument is NULL
+##  @param[in] conversion  Conversion type, see `TopologyConvert::Enum`.
+##  @param[out] dst Destination index buffer. If this argument is NULL
 ##   function will return number of indices after conversion.
-##  @param[in] _dstSize Destination index buffer in bytes. It must be
+##  @param[in] dstSize Destination index buffer in bytes. It must be
 ##   large enough to contain output indices. If destination size is
 ##   insufficient index buffer will be truncated.
-##  @param[in] _indices Source indices.
-##  @param[in] _numIndices Number of input indices.
-##  @param[in] _index32 Set to `true` if input indices are 32-bit.
+##  @param[in] indices Source indices.
+##  @param[in] numIndices Number of input indices.
+##  @param[in] index32 Set to `true` if input indices are 32-bit.
 ##
 ##  @returns Number of output indices after conversion.
 ##
 ##
 
-proc bgfx_topology_convert*(_conversion: bgfx_topology_convert_t; _dst: pointer;
-                           _dstSize: uint32; _indices: pointer;
-                           _numIndices: uint32; _index32: bool): uint32 {.cdecl,
+proc bgfx_topology_convert*(conversion : bgfx_topology_convert_t; dst: pointer;
+                           dstSize: uint32; indices: pointer;
+                           numIndices: uint32; index32: bool): uint32 {.cdecl,
     importc: "bgfx_topology_convert", dynlib: bgfxdll.}
 ## *
 ##  Sort indices.
 ##
-##  @param[in] _sort Sort order, see `TopologySort::Enum`.
-##  @param[out] _dst Destination index buffer.
-##  @param[in] _dstSize Destination index buffer in bytes. It must be
+##  @param[in] sort Sort order, see `TopologySort::Enum`.
+##  @param[out] dst Destination index buffer.
+##  @param[in] dstSize Destination index buffer in bytes. It must be
 ##   large enough to contain output indices. If destination size is
 ##   insufficient index buffer will be truncated.
-##  @param[in] _dir Direction (vector must be normalized).
-##  @param[in] _pos Position.
-##  @param[in] _vertices Pointer to first vertex represented as
+##  @param[in] dir Direction (vector must be normalized).
+##  @param[in] pos Position.
+##  @param[in] vertices Pointer to first vertex represented as
 ##   float x, y, z. Must contain at least number of vertices
 ##   referencende by index buffer.
-##  @param[in] _stride Vertex stride.
-##  @param[in] _indices Source indices.
-##  @param[in] _numIndices Number of input indices.
-##  @param[in] _index32 Set to `true` if input indices are 32-bit.
+##  @param[in] stride Vertex stride.
+##  @param[in] indices Source indices.
+##  @param[in] numIndices Number of input indices.
+##  @param[in] index32 Set to `true` if input indices are 32-bit.
 ##
 ##
 
-proc bgfx_topology_sort_tri_list*(_sort: bgfx_topology_sort_t; _dst: pointer;
-                                 _dstSize: uint32; _dir: array[3, cfloat];
-                                 _pos: array[3, cfloat]; _vertices: pointer;
-                                 _stride: uint32; _indices: pointer;
-                                 _numIndices: uint32; _index32: bool) {.cdecl,
+proc bgfx_topology_sort_tri_list*(sort: bgfx_topology_sort_t; dst: pointer;
+                                 dstSize: uint32; dir: array[3, cfloat];
+                                 pos: array[3, cfloat]; vertices: pointer;
+                                 stride: uint32; indices: pointer;
+                                 numIndices: uint32; index32: bool) {.cdecl,
     importc: "bgfx_topology_sort_tri_list", dynlib: bgfxdll.}
 ## *
 ##  Returns supported backend API renderers.
@@ -1087,7 +1083,7 @@ proc bgfx_topology_sort_tri_list*(_sort: bgfx_topology_sort_t; _dst: pointer;
 ##
 ##
 
-proc bgfx_get_supported_renderers*(_max: uint8; _enum: ptr bgfx_renderer_type_t): uint8 {.
+proc bgfx_get_supported_renderers*(max: uint8; renderEnum: ptr bgfx_renderer_type_t): uint8 {.
     cdecl, importc: "bgfx_get_supported_renderers", dynlib: bgfxdll.}
 ## *
 ##  Returns name of renderer.
@@ -1098,20 +1094,20 @@ proc bgfx_get_supported_renderers*(_max: uint8; _enum: ptr bgfx_renderer_type_t)
 ##
 ##
 
-proc bgfx_get_renderer_name*(_type: bgfx_renderer_type_t): cstring {.cdecl,
+proc bgfx_get_renderer_name*(`type`: bgfx_renderer_type_t): cstring {.cdecl,
     importc: "bgfx_get_renderer_name", dynlib: bgfxdll.}
-proc bgfx_init_ctor*(_init: ptr bgfx_init_t) {.cdecl, importc: "bgfx_init_ctor",
+proc bgfx_init_ctor*(init: ptr bgfx_init_t) {.cdecl, importc: "bgfx_init_ctor",
     dynlib: bgfxdll.}
 ## *
 ##  Initialize the bgfx library.
 ##
-##  @param[in] _init Initialization parameters. See: `bgfx::Init` for more info.
+##  @param[in] init Initialization parameters. See: `bgfx::Init` for more info.
 ##
 ##  @returns `true` if initialization was successful.
 ##
 ##
 
-proc bgfx_init*(_init: ptr bgfx_init_t): bool {.cdecl, importc: "bgfx_init",
+proc bgfx_init*(init: ptr bgfx_init_t): bool {.cdecl, importc: "bgfx_init",
     dynlib: bgfxdll.}
 ## *
 ##  Shutdown bgfx library.
@@ -1124,9 +1120,9 @@ proc bgfx_shutdown*() {.cdecl, importc: "bgfx_shutdown", dynlib: bgfxdll.}
 ##  @attention This call doesn’t change the window size, it just resizes
 ##    the back-buffer. Your windowing code controls the window size.
 ##
-##  @param[in] _width Back-buffer width.
-##  @param[in] _height Back-buffer height.
-##  @param[in] _flags See: `BGFX_RESET_*` for more info.
+##  @param[in] width Back-buffer width.
+##  @param[in] height Back-buffer height.
+##  @param[in] flags See: `BGFX_RESET_*` for more info.
 ##     - `BGFX_RESET_NONE` - No reset flags.
 ##     - `BGFX_RESET_FULLSCREEN` - Not supported yet.
 ##     - `BGFX_RESET_MSAA_X[2/4/8/16]` - Enable 2, 4, 8 or 16 x MSAA.
@@ -1138,12 +1134,12 @@ proc bgfx_shutdown*() {.cdecl, importc: "bgfx_shutdown", dynlib: bgfxdll.}
 ##       occurs. Default behaviour is that flip occurs before rendering new
 ##       frame. This flag only has effect when `BGFX_CONFIG_MULTITHREADED=0`.
 ##     - `BGFX_RESET_SRGB_BACKBUFFER` - Enable sRGB back-buffer.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
 ##
 ##
 
-proc bgfx_reset*(_width: uint32; _height: uint32; _flags: uint32;
-                _format: bgfx_texture_format_t) {.cdecl, importc: "bgfx_reset",
+proc bgfx_reset*(width: uint32; height: uint32; flags: uint32;
+                format: bgfx_texture_format_t) {.cdecl, importc: "bgfx_reset",
     dynlib: bgfxdll.}
 ## *
 ##  Advance to next frame. When using multithreaded renderer, this call
@@ -1158,7 +1154,7 @@ proc bgfx_reset*(_width: uint32; _height: uint32; _flags: uint32;
 ##
 ##
 
-proc bgfx_frame*(_capture: bool): uint32 {.cdecl, importc: "bgfx_frame",
+proc bgfx_frame*(capture: bool): uint32 {.cdecl, importc: "bgfx_frame",
     dynlib: bgfxdll.}
 ## *
 ##  Returns current renderer backend API type.
@@ -1189,64 +1185,64 @@ proc bgfx_get_stats*(): ptr bgfx_stats_t {.cdecl, importc: "bgfx_get_stats",
 ## *
 ##  Allocate buffer to pass to bgfx calls. Data will be freed inside bgfx.
 ##
-##  @param[in] _size Size to allocate.
+##  @param[in] size Size to allocate.
 ##
 ##  @returns Allocated memory.
 ##
 ##
 
-proc bgfx_alloc*(_size: uint32): ptr bgfx_memory_t {.cdecl, importc: "bgfx_alloc",
+proc bgfx_alloc*(size: uint32): ptr bgfx_memory_t {.cdecl, importc: "bgfx_alloc",
     dynlib: bgfxdll.}
 ## *
 ##  Allocate buffer and copy data into it. Data will be freed inside bgfx.
 ##
-##  @param[in] _data Pointer to data to be copied.
-##  @param[in] _size Size of data to be copied.
+##  @param[in] data Pointer to data to be copied.
+##  @param[in] size Size of data to be copied.
 ##
 ##  @returns Allocated memory.
 ##
 ##
 
-proc bgfx_copy*(_data: pointer; _size: uint32): ptr bgfx_memory_t {.cdecl,
+proc bgfx_copy*(data: pointer; size: uint32): ptr bgfx_memory_t {.cdecl,
     importc: "bgfx_copy", dynlib: bgfxdll.}
 ## *
 ##  Make reference to data to pass to bgfx. Unlike `bgfx::alloc`, this call
-##  doesn't allocate memory for data. It just copies the _data pointer. You
+##  doesn't allocate memory for data. It just copies the data pointer. You
 ##  can pass `ReleaseFn` function pointer to release this memory after it's
-##  consumed, otherwise you must make sure _data is available for at least 2
+##  consumed, otherwise you must make sure data is available for at least 2
 ##  `bgfx::frame` calls. `ReleaseFn` function must be able to be called
 ##  from any thread.
 ##  @attention Data passed must be available for at least 2 `bgfx::frame` calls.
 ##
-##  @param[in] _data Pointer to data.
-##  @param[in] _size Size of data.
+##  @param[in] data Pointer to data.
+##  @param[in] size Size of data.
 ##
 ##  @returns Referenced memory.
 ##
 ##
 
-proc bgfx_make_ref*(_data: pointer; _size: uint32): ptr bgfx_memory_t {.cdecl,
+proc bgfx_make_ref*(data: pointer; size: uint32): ptr bgfx_memory_t {.cdecl,
     importc: "bgfx_make_ref", dynlib: bgfxdll.}
 ## *
 ##  Make reference to data to pass to bgfx. Unlike `bgfx::alloc`, this call
-##  doesn't allocate memory for data. It just copies the _data pointer. You
+##  doesn't allocate memory for data. It just copies the data pointer. You
 ##  can pass `ReleaseFn` function pointer to release this memory after it's
-##  consumed, otherwise you must make sure _data is available for at least 2
+##  consumed, otherwise you must make sure data is available for at least 2
 ##  `bgfx::frame` calls. `ReleaseFn` function must be able to be called
 ##  from any thread.
 ##  @attention Data passed must be available for at least 2 `bgfx::frame` calls.
 ##
-##  @param[in] _data Pointer to data.
-##  @param[in] _size Size of data.
-##  @param[in] _releaseFn Callback function to release memory after use.
-##  @param[in] _userData User data to be passed to callback function.
+##  @param[in] data Pointer to data.
+##  @param[in] size Size of data.
+##  @param[in] releaseFn Callback function to release memory after use.
+##  @param[in] userData User data to be passed to callback function.
 ##
 ##  @returns Referenced memory.
 ##
 ##
 
-proc bgfx_make_ref_release*(_data: pointer; _size: uint32;
-                           _releaseFn: bgfx_release_fn_t; _userData: pointer): ptr bgfx_memory_t {.
+proc bgfx_make_ref_release*(data: pointer; size: uint32;
+                           releaseFn: bgfx_release_fn_t; userData: pointer): ptr bgfx_memory_t {.
     cdecl, importc: "bgfx_make_ref_release", dynlib: bgfxdll.}
 ## *
 ##  Set debug flags.
@@ -1263,67 +1259,67 @@ proc bgfx_make_ref_release*(_data: pointer; _size: uint32;
 ##
 ##
 
-proc bgfx_set_debug*(_debug: uint32) {.cdecl, importc: "bgfx_set_debug",
+proc bgfx_set_debug*(debug: uint32) {.cdecl, importc: "bgfx_set_debug",
                                       dynlib: bgfxdll.}
 ## *
 ##  Clear internal debug text buffer.
 ##
-##  @param[in] _attr Background color.
-##  @param[in] _small Default 8x16 or 8x8 font.
+##  @param[in] attr Background color.
+##  @param[in] small Default 8x16 or 8x8 font.
 ##
 ##
 
-proc bgfx_dbg_text_clear*(_attr: uint8; _small: bool) {.cdecl,
+proc bgfx_dbg_text_clear*(attr: uint8; small: bool) {.cdecl,
     importc: "bgfx_dbg_text_clear", dynlib: bgfxdll.}
 ## *
 ##  Print formatted data to internal debug text character-buffer (VGA-compatible text mode).
 ##
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _attr Color palette. Where top 4-bits represent index of background, and bottom
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] attr Color palette. Where top 4-bits represent index of background, and bottom
 ##   4-bits represent foreground color from standard VGA text palette (ANSI escape codes).
-##  @param[in] _format `printf` style format.
+##  @param[in] format `printf` style format.
 ##  @param[in]
 ##
 ##
 
-proc bgfx_dbg_text_printf*(_x: uint16; _y: uint16; _attr: uint8; _format: cstring) {.
+proc bgfx_dbg_text_printf*(x: uint16; y: uint16; attr: uint8; format: cstring) {.
     varargs, cdecl, importc: "bgfx_dbg_text_printf", dynlib: bgfxdll.}
 ## *
 ##  Print formatted data from variable argument list to internal debug text character-buffer (VGA-compatible text mode).
 ##
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _attr Color palette. Where top 4-bits represent index of background, and bottom
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] attr Color palette. Where top 4-bits represent index of background, and bottom
 ##   4-bits represent foreground color from standard VGA text palette (ANSI escape codes).
-##  @param[in] _format `printf` style format.
-##  @param[in] _argList Variable arguments list for format string.
+##  @param[in] format `printf` style format.
+##  @param[in] argList Variable arguments list for format string.
 ##
 ##
 
-proc bgfx_dbg_text_vprintf*(_x: uint16; _y: uint16; _attr: uint8;
-                           _format: cstring; _argList: va_list) {.cdecl,
+proc bgfx_dbg_text_vprintf*(x: uint16; y: uint16; attr: uint8;
+                           format: cstring; argList: va_list) {.cdecl,
     importc: "bgfx_dbg_text_vprintf", dynlib: bgfxdll.}
 ## *
 ##  Draw image into internal debug text buffer.
 ##
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _width Image width.
-##  @param[in] _height Image height.
-##  @param[in] _data Raw image data (character/attribute raw encoding).
-##  @param[in] _pitch Image pitch in bytes.
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] width Image width.
+##  @param[in] height Image height.
+##  @param[in] data Raw image data (character/attribute raw encoding).
+##  @param[in] pitch Image pitch in bytes.
 ##
 ##
 
-proc bgfx_dbg_text_image*(_x: uint16; _y: uint16; _width: uint16;
-                         _height: uint16; _data: pointer; _pitch: uint16) {.cdecl,
+proc bgfx_dbg_text_image*(x: uint16; y: uint16; width: uint16;
+                         height: uint16; data: pointer; pitch: uint16) {.cdecl,
     importc: "bgfx_dbg_text_image", dynlib: bgfxdll.}
 ## *
 ##  Create static index buffer.
 ##
-##  @param[in] _mem Index buffer data.
-##  @param[in] _flags Buffer creation flags.
+##  @param[in] mem Index buffer data.
+##  @param[in] flags Buffer creation flags.
 ##     - `BGFX_BUFFER_NONE` - No flags.
 ##     - `BGFX_BUFFER_COMPUTE_READ` - Buffer will be read from by compute shader.
 ##     - `BGFX_BUFFER_COMPUTE_WRITE` - Buffer will be written into by compute shader. When buffer
@@ -1338,54 +1334,54 @@ proc bgfx_dbg_text_image*(_x: uint16; _y: uint16; _width: uint16;
 ##
 ##
 
-proc bgfx_create_index_buffer*(_mem: ptr bgfx_memory_t; _flags: uint16): bgfx_index_buffer_handle_t {.
+proc bgfx_create_index_buffer*(mem: ptr bgfx_memory_t; flags: uint16): bgfx_index_buffer_handle_t {.
     cdecl, importc: "bgfx_create_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set static index buffer debug name.
 ##
-##  @param[in] _handle Static index buffer handle.
-##  @param[in] _name Static index buffer name.
-##  @param[in] _len Static index buffer name length (if length is INT32_MAX, it's expected
-##   that _name is zero terminated string.
+##  @param[in] handle Static index buffer handle.
+##  @param[in] name Static index buffer name.
+##  @param[in] len Static index buffer name length (if length is INT32_MAX, it's expected
+##   that name is zero terminated string.
 ##
 ##
 
-proc bgfx_set_index_buffer_name*(_handle: bgfx_index_buffer_handle_t;
-                                _name: cstring; _len: int32_t) {.cdecl,
+proc bgfx_set_index_buffer_name*(handle: bgfx_index_buffer_handle_t;
+                                name: cstring; len: int32) {.cdecl,
     importc: "bgfx_set_index_buffer_name", dynlib: bgfxdll.}
 ## *
 ##  Destroy static index buffer.
 ##
-##  @param[in] _handle Static index buffer handle.
+##  @param[in] handle Static index buffer handle.
 ##
 ##
 
-proc bgfx_destroy_index_buffer*(_handle: bgfx_index_buffer_handle_t) {.cdecl,
+proc bgfx_destroy_index_buffer*(handle: bgfx_index_buffer_handle_t) {.cdecl,
     importc: "bgfx_destroy_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create vertex layout.
 ##
-##  @param[in] _layout Vertex layout.
+##  @param[in] layout Vertex layout.
 ##
 ##
 
-proc bgfx_create_vertex_layout*(_layout: ptr bgfx_vertex_layout_t): bgfx_vertex_layout_handle_t {.
+proc bgfx_create_vertex_layout*(layout: ptr bgfx_vertex_layout_t): bgfx_vertex_layout_handle_t {.
     cdecl, importc: "bgfx_create_vertex_layout", dynlib: bgfxdll.}
 ## *
 ##  Destroy vertex layout.
 ##
-##  @param[in] _layoutHandle Vertex layout handle.
+##  @param[in] layoutHandle Vertex layout handle.
 ##
 ##
 
-proc bgfx_destroy_vertex_layout*(_layoutHandle: bgfx_vertex_layout_handle_t) {.
+proc bgfx_destroy_vertex_layout*(layoutHandle: bgfx_vertex_layout_handle_t) {.
     cdecl, importc: "bgfx_destroy_vertex_layout", dynlib: bgfxdll.}
 ## *
 ##  Create static vertex buffer.
 ##
-##  @param[in] _mem Vertex buffer data.
-##  @param[in] _layout Vertex layout.
-##  @param[in] _flags Buffer creation flags.
+##  @param[in] mem Vertex buffer data.
+##  @param[in] layout Vertex layout.
+##  @param[in] flags Buffer creation flags.
 ##    - `BGFX_BUFFER_NONE` - No flags.
 ##    - `BGFX_BUFFER_COMPUTE_READ` - Buffer will be read from by compute shader.
 ##    - `BGFX_BUFFER_COMPUTE_WRITE` - Buffer will be written into by compute shader. When buffer
@@ -1400,21 +1396,21 @@ proc bgfx_destroy_vertex_layout*(_layoutHandle: bgfx_vertex_layout_handle_t) {.
 ##
 ##
 
-proc bgfx_create_vertex_buffer*(_mem: ptr bgfx_memory_t;
-                               _layout: ptr bgfx_vertex_layout_t; _flags: uint16): bgfx_vertex_buffer_handle_t {.
+proc bgfx_create_vertex_buffer*(mem: ptr bgfx_memory_t;
+                               layout: ptr bgfx_vertex_layout_t; flags: uint16): bgfx_vertex_buffer_handle_t {.
     cdecl, importc: "bgfx_create_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set static vertex buffer debug name.
 ##
-##  @param[in] _handle Static vertex buffer handle.
-##  @param[in] _name Static vertex buffer name.
-##  @param[in] _len Static vertex buffer name length (if length is INT32_MAX, it's expected
-##   that _name is zero terminated string.
+##  @param[in] handle Static vertex buffer handle.
+##  @param[in] name Static vertex buffer name.
+##  @param[in] len Static vertex buffer name length (if length is INT32_MAX, it's expected
+##   that name is zero terminated string.
 ##
 ##
 
-proc bgfx_set_vertex_buffer_name*(_handle: bgfx_vertex_buffer_handle_t;
-                                 _name: cstring; _len: int32_t) {.cdecl,
+proc bgfx_set_vertex_buffer_name*(handle: bgfx_vertex_buffer_handle_t;
+                                 name: cstring; len: int32) {.cdecl,
     importc: "bgfx_set_vertex_buffer_name", dynlib: bgfxdll.}
 ## *
 ##  Destroy static vertex buffer.
@@ -1423,13 +1419,13 @@ proc bgfx_set_vertex_buffer_name*(_handle: bgfx_vertex_buffer_handle_t;
 ##
 ##
 
-proc bgfx_destroy_vertex_buffer*(_handle: bgfx_vertex_buffer_handle_t) {.cdecl,
+proc bgfx_destroy_vertex_buffer*(handle: bgfx_vertex_buffer_handle_t) {.cdecl,
     importc: "bgfx_destroy_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create empty dynamic index buffer.
 ##
-##  @param[in] _num Number of indices.
-##  @param[in] _flags Buffer creation flags.
+##  @param[in] num Number of indices.
+##  @param[in] flags Buffer creation flags.
 ##     - `BGFX_BUFFER_NONE` - No flags.
 ##     - `BGFX_BUFFER_COMPUTE_READ` - Buffer will be read from by compute shader.
 ##     - `BGFX_BUFFER_COMPUTE_WRITE` - Buffer will be written into by compute shader. When buffer
@@ -1446,13 +1442,13 @@ proc bgfx_destroy_vertex_buffer*(_handle: bgfx_vertex_buffer_handle_t) {.cdecl,
 ##
 ##
 
-proc bgfx_create_dynamic_index_buffer*(_num: uint32; _flags: uint16): bgfx_dynamic_index_buffer_handle_t {.
+proc bgfx_create_dynamic_index_buffer*(num: uint32; flags: uint16): bgfx_dynamic_index_buffer_handle_t {.
     cdecl, importc: "bgfx_create_dynamic_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create a dynamic index buffer and initialize it.
 ##
-##  @param[in] _mem Index buffer data.
-##  @param[in] _flags Buffer creation flags.
+##  @param[in] mem Index buffer data.
+##  @param[in] flags Buffer creation flags.
 ##     - `BGFX_BUFFER_NONE` - No flags.
 ##     - `BGFX_BUFFER_COMPUTE_READ` - Buffer will be read from by compute shader.
 ##     - `BGFX_BUFFER_COMPUTE_WRITE` - Buffer will be written into by compute shader. When buffer
@@ -1469,7 +1465,7 @@ proc bgfx_create_dynamic_index_buffer*(_num: uint32; _flags: uint16): bgfx_dynam
 ##
 ##
 
-proc bgfx_create_dynamic_index_buffer_mem*(_mem: ptr bgfx_memory_t; _flags: uint16): bgfx_dynamic_index_buffer_handle_t {.
+proc bgfx_create_dynamic_index_buffer_mem*(mem: ptr bgfx_memory_t; flags: uint16): bgfx_dynamic_index_buffer_handle_t {.
     cdecl, importc: "bgfx_create_dynamic_index_buffer_mem", dynlib: bgfxdll.}
 ## *
 ##  Update dynamic index buffer.
@@ -1480,9 +1476,9 @@ proc bgfx_create_dynamic_index_buffer_mem*(_mem: ptr bgfx_memory_t; _flags: uint
 ##
 ##
 
-proc bgfx_update_dynamic_index_buffer*(_handle: bgfx_dynamic_index_buffer_handle_t;
-                                      _startIndex: uint32;
-                                      _mem: ptr bgfx_memory_t) {.cdecl,
+proc bgfx_update_dynamic_index_buffer*(handle: bgfx_dynamic_index_buffer_handle_t;
+                                      startIndex: uint32;
+                                      mem: ptr bgfx_memory_t) {.cdecl,
     importc: "bgfx_update_dynamic_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Destroy dynamic index buffer.
@@ -1491,14 +1487,14 @@ proc bgfx_update_dynamic_index_buffer*(_handle: bgfx_dynamic_index_buffer_handle
 ##
 ##
 
-proc bgfx_destroy_dynamic_index_buffer*(_handle: bgfx_dynamic_index_buffer_handle_t) {.
+proc bgfx_destroy_dynamic_index_buffer*(handle: bgfx_dynamic_index_buffer_handle_t) {.
     cdecl, importc: "bgfx_destroy_dynamic_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create empty dynamic vertex buffer.
 ##
-##  @param[in] _num Number of vertices.
-##  @param[in] _layout Vertex layout.
-##  @param[in] _flags Buffer creation flags.
+##  @param[in] num Number of vertices.
+##  @param[in] layout Vertex layout.
+##  @param[in] flags Buffer creation flags.
 ##     - `BGFX_BUFFER_NONE` - No flags.
 ##     - `BGFX_BUFFER_COMPUTE_READ` - Buffer will be read from by compute shader.
 ##     - `BGFX_BUFFER_COMPUTE_WRITE` - Buffer will be written into by compute shader. When buffer
@@ -1515,16 +1511,16 @@ proc bgfx_destroy_dynamic_index_buffer*(_handle: bgfx_dynamic_index_buffer_handl
 ##
 ##
 
-proc bgfx_create_dynamic_vertex_buffer*(_num: uint32;
-                                       _layout: ptr bgfx_vertex_layout_t;
-                                       _flags: uint16): bgfx_dynamic_vertex_buffer_handle_t {.
+proc bgfx_create_dynamic_vertex_buffer*(num: uint32;
+                                       layout: ptr bgfx_vertex_layout_t;
+                                       flags: uint16): bgfx_dynamic_vertex_buffer_handle_t {.
     cdecl, importc: "bgfx_create_dynamic_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create dynamic vertex buffer and initialize it.
 ##
-##  @param[in] _mem Vertex buffer data.
-##  @param[in] _layout Vertex layout.
-##  @param[in] _flags Buffer creation flags.
+##  @param[in] mem Vertex buffer data.
+##  @param[in] layout Vertex layout.
+##  @param[in] flags Buffer creation flags.
 ##     - `BGFX_BUFFER_NONE` - No flags.
 ##     - `BGFX_BUFFER_COMPUTE_READ` - Buffer will be read from by compute shader.
 ##     - `BGFX_BUFFER_COMPUTE_WRITE` - Buffer will be written into by compute shader. When buffer
@@ -1541,67 +1537,67 @@ proc bgfx_create_dynamic_vertex_buffer*(_num: uint32;
 ##
 ##
 
-proc bgfx_create_dynamic_vertex_buffer_mem*(_mem: ptr bgfx_memory_t;
-    _layout: ptr bgfx_vertex_layout_t; _flags: uint16): bgfx_dynamic_vertex_buffer_handle_t {.
+proc bgfx_create_dynamic_vertex_buffer_mem*(mem: ptr bgfx_memory_t;
+    layout: ptr bgfx_vertex_layout_t; flags: uint16): bgfx_dynamic_vertex_buffer_handle_t {.
     cdecl, importc: "bgfx_create_dynamic_vertex_buffer_mem", dynlib: bgfxdll.}
 ## *
 ##  Update dynamic vertex buffer.
 ##
-##  @param[in] _handle Dynamic vertex buffer handle.
-##  @param[in] _startVertex Start vertex.
-##  @param[in] _mem Vertex buffer data.
+##  @param[in] handle Dynamic vertex buffer handle.
+##  @param[in] startVertex Start vertex.
+##  @param[in] mem Vertex buffer data.
 ##
 ##
 
-proc bgfx_update_dynamic_vertex_buffer*(_handle: bgfx_dynamic_vertex_buffer_handle_t;
-                                       _startVertex: uint32;
-                                       _mem: ptr bgfx_memory_t) {.cdecl,
+proc bgfx_update_dynamic_vertex_buffer*(handle: bgfx_dynamic_vertex_buffer_handle_t;
+                                       startVertex: uint32;
+                                       mem: ptr bgfx_memory_t) {.cdecl,
     importc: "bgfx_update_dynamic_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Destroy dynamic vertex buffer.
 ##
-##  @param[in] _handle Dynamic vertex buffer handle.
+##  @param[in] handle Dynamic vertex buffer handle.
 ##
 ##
 
-proc bgfx_destroy_dynamic_vertex_buffer*(_handle: bgfx_dynamic_vertex_buffer_handle_t) {.
+proc bgfx_destroy_dynamic_vertex_buffer*(handle: bgfx_dynamic_vertex_buffer_handle_t) {.
     cdecl, importc: "bgfx_destroy_dynamic_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Returns number of requested or maximum available indices.
 ##
-##  @param[in] _num Number of required indices.
-##  @param[in] _index32 Set to `true` if input indices will be 32-bit.
+##  @param[in] num Number of required indices.
+##  @param[in] index32 Set to `true` if input indices will be 32-bit.
 ##
 ##  @returns Number of requested or maximum available indices.
 ##
 ##
 
-proc bgfx_get_avail_transient_index_buffer*(_num: uint32; _index32: bool): uint32 {.
+proc bgfx_get_avail_transient_index_buffer*(num: uint32; index32: bool): uint32 {.
     cdecl, importc: "bgfx_get_avail_transient_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Returns number of requested or maximum available vertices.
 ##
-##  @param[in] _num Number of required vertices.
-##  @param[in] _layout Vertex layout.
+##  @param[in] num Number of required vertices.
+##  @param[in] layout Vertex layout.
 ##
 ##  @returns Number of requested or maximum available vertices.
 ##
 ##
 
-proc bgfx_get_avail_transient_vertex_buffer*(_num: uint32;
-    _layout: ptr bgfx_vertex_layout_t): uint32 {.cdecl,
+proc bgfx_get_avail_transient_vertex_buffer*(num: uint32;
+    layout: ptr bgfx_vertex_layout_t): uint32 {.cdecl,
     importc: "bgfx_get_avail_transient_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Returns number of requested or maximum available instance buffer slots.
 ##
-##  @param[in] _num Number of required instances.
-##  @param[in] _stride Stride per instance.
+##  @param[in] num Number of required instances.
+##  @param[in] stride Stride per instance.
 ##
 ##  @returns Number of requested or maximum available instance buffer slots.
 ##
 ##
 
-proc bgfx_get_avail_instance_data_buffer*(_num: uint32; _stride: uint16): uint32 {.
+proc bgfx_get_avail_instance_data_buffer*(num: uint32; stride: uint16): uint32 {.
     cdecl, importc: "bgfx_get_avail_instance_data_buffer", dynlib: bgfxdll.}
 ## *
 ##  Allocate transient index buffer.
@@ -1609,77 +1605,77 @@ proc bgfx_get_avail_instance_data_buffer*(_num: uint32; _stride: uint16): uint32
 ##  @param[out] _tib TransientIndexBuffer structure is filled and is valid
 ##   for the duration of frame, and it can be reused for multiple draw
 ##   calls.
-##  @param[in] _num Number of indices to allocate.
-##  @param[in] _index32 Set to `true` if input indices will be 32-bit.
+##  @param[in] num Number of indices to allocate.
+##  @param[in] index32 Set to `true` if input indices will be 32-bit.
 ##
 ##
 
-proc bgfx_alloc_transient_index_buffer*(_tib: ptr bgfx_transient_index_buffer_t;
-                                       _num: uint32; _index32: bool) {.cdecl,
+proc bgfx_alloc_transient_index_buffer*(tib: ptr bgfx_transient_index_buffer_t;
+                                       num: uint32; index32: bool) {.cdecl,
     importc: "bgfx_alloc_transient_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Allocate transient vertex buffer.
 ##
-##  @param[out] _tvb TransientVertexBuffer structure is filled and is valid
+##  @param[out] tvb TransientVertexBuffer structure is filled and is valid
 ##   for the duration of frame, and it can be reused for multiple draw
 ##   calls.
-##  @param[in] _num Number of vertices to allocate.
-##  @param[in] _layout Vertex layout.
+##  @param[in] num Number of vertices to allocate.
+##  @param[in] layout Vertex layout.
 ##
 ##
 
-proc bgfx_alloc_transient_vertex_buffer*(_tvb: ptr bgfx_transient_vertex_buffer_t;
-                                        _num: uint32;
-                                        _layout: ptr bgfx_vertex_layout_t) {.cdecl,
+proc bgfx_alloc_transient_vertex_buffer*(tvb: ptr bgfx_transient_vertex_buffer_t;
+                                        num: uint32;
+                                        layout: ptr bgfx_vertex_layout_t) {.cdecl,
     importc: "bgfx_alloc_transient_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Check for required space and allocate transient vertex and index
 ##  buffers. If both space requirements are satisfied function returns
 ##  true.
 ##
-##  @param[out] _tvb TransientVertexBuffer structure is filled and is valid
+##  @param[out] tvb TransientVertexBuffer structure is filled and is valid
 ##   for the duration of frame, and it can be reused for multiple draw
 ##   calls.
-##  @param[in] _layout Vertex layout.
-##  @param[in] _numVertices Number of vertices to allocate.
-##  @param[out] _tib TransientIndexBuffer structure is filled and is valid
+##  @param[in] layout Vertex layout.
+##  @param[in] numVertices Number of vertices to allocate.
+##  @param[out] tib TransientIndexBuffer structure is filled and is valid
 ##   for the duration of frame, and it can be reused for multiple draw
 ##   calls.
-##  @param[in] _numIndices Number of indices to allocate.
-##  @param[in] _index32 Set to `true` if input indices will be 32-bit.
+##  @param[in] numIndices Number of indices to allocate.
+##  @param[in] index32 Set to `true` if input indices will be 32-bit.
 ##
 ##
 
-proc bgfx_alloc_transient_buffers*(_tvb: ptr bgfx_transient_vertex_buffer_t;
-                                  _layout: ptr bgfx_vertex_layout_t;
-                                  _numVertices: uint32;
-                                  _tib: ptr bgfx_transient_index_buffer_t;
-                                  _numIndices: uint32; _index32: bool): bool {.
+proc bgfx_alloc_transient_buffers*(tvb: ptr bgfx_transient_vertex_buffer_t;
+                                  layout: ptr bgfx_vertex_layout_t;
+                                  numVertices: uint32;
+                                  tib: ptr bgfx_transient_index_buffer_t;
+                                  numIndices: uint32; index32: bool): bool {.
     cdecl, importc: "bgfx_alloc_transient_buffers", dynlib: bgfxdll.}
 ## *
 ##  Allocate instance data buffer.
 ##
-##  @param[out] _idb InstanceDataBuffer structure is filled and is valid
+##  @param[out] idb InstanceDataBuffer structure is filled and is valid
 ##   for duration of frame, and it can be reused for multiple draw
 ##   calls.
-##  @param[in] _num Number of instances.
-##  @param[in] _stride Instance stride. Must be multiple of 16.
+##  @param[in] num Number of instances.
+##  @param[in] stride Instance stride. Must be multiple of 16.
 ##
 ##
 
-proc bgfx_alloc_instance_data_buffer*(_idb: ptr bgfx_instance_data_buffer_t;
-                                     _num: uint32; _stride: uint16) {.cdecl,
+proc bgfx_alloc_instance_data_buffer*(idb: ptr bgfx_instance_data_buffer_t;
+                                     num: uint32; stride: uint16) {.cdecl,
     importc: "bgfx_alloc_instance_data_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create draw indirect buffer.
 ##
-##  @param[in] _num Number of indirect calls.
+##  @param[in] num Number of indirect calls.
 ##
 ##  @returns Indirect buffer handle.
 ##
 ##
 
-proc bgfx_create_indirect_buffer*(_num: uint32): bgfx_indirect_buffer_handle_t {.
+proc bgfx_create_indirect_buffer*(num: uint32): bgfx_indirect_buffer_handle_t {.
     cdecl, importc: "bgfx_create_indirect_buffer", dynlib: bgfxdll.}
 ## *
 ##  Destroy draw indirect buffer.
@@ -1688,18 +1684,18 @@ proc bgfx_create_indirect_buffer*(_num: uint32): bgfx_indirect_buffer_handle_t {
 ##
 ##
 
-proc bgfx_destroy_indirect_buffer*(_handle: bgfx_indirect_buffer_handle_t) {.cdecl,
+proc bgfx_destroy_indirect_buffer*(handle: bgfx_indirect_buffer_handle_t) {.cdecl,
     importc: "bgfx_destroy_indirect_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create shader from memory buffer.
 ##
-##  @param[in] _mem Shader binary.
+##  @param[in] mem Shader binary.
 ##
 ##  @returns Shader handle.
 ##
 ##
 
-proc bgfx_create_shader*(_mem: ptr bgfx_memory_t): bgfx_shader_handle_t {.cdecl,
+proc bgfx_create_shader*(mem: ptr bgfx_memory_t): bgfx_shader_handle_t {.cdecl,
     importc: "bgfx_create_shader", dynlib: bgfxdll.}
 ## *
 ##  Returns the number of uniforms and uniform handles used inside a shader.
@@ -1714,21 +1710,21 @@ proc bgfx_create_shader*(_mem: ptr bgfx_memory_t): bgfx_shader_handle_t {.cdecl,
 ##
 ##
 
-proc bgfx_get_shader_uniforms*(_handle: bgfx_shader_handle_t;
-                              _uniforms: ptr bgfx_uniform_handle_t; _max: uint16): uint16 {.
+proc bgfx_get_shader_uniforms*(handle: bgfx_shader_handle_t;
+                              uniforms: ptr bgfx_uniform_handle_t; max: uint16): uint16 {.
     cdecl, importc: "bgfx_get_shader_uniforms", dynlib: bgfxdll.}
 ## *
 ##  Set shader debug name.
 ##
-##  @param[in] _handle Shader handle.
-##  @param[in] _name Shader name.
-##  @param[in] _len Shader name length (if length is INT32_MAX, it's expected
-##   that _name is zero terminated string).
+##  @param[in] handle Shader handle.
+##  @param[in] name Shader name.
+##  @param[in] len Shader name length (if length is INT32_MAX, it's expected
+##   that name is zero terminated string).
 ##
 ##
 
-proc bgfx_set_shader_name*(_handle: bgfx_shader_handle_t; _name: cstring;
-                          _len: int32_t) {.cdecl, importc: "bgfx_set_shader_name",
+proc bgfx_set_shader_name*(handle: bgfx_shader_handle_t; name: cstring;
+                          len: int32) {.cdecl, importc: "bgfx_set_shader_name",
     dynlib: bgfxdll.}
 ## *
 ##  Destroy shader.
@@ -1739,7 +1735,7 @@ proc bgfx_set_shader_name*(_handle: bgfx_shader_handle_t; _name: cstring;
 ##
 ##
 
-proc bgfx_destroy_shader*(_handle: bgfx_shader_handle_t) {.cdecl,
+proc bgfx_destroy_shader*(handle: bgfx_shader_handle_t) {.cdecl,
     importc: "bgfx_destroy_shader", dynlib: bgfxdll.}
 ## *
 ##  Create program with vertex and fragment shaders.
@@ -1753,8 +1749,8 @@ proc bgfx_destroy_shader*(_handle: bgfx_shader_handle_t) {.cdecl,
 ##
 ##
 
-proc bgfx_create_program*(_vsh: bgfx_shader_handle_t; _fsh: bgfx_shader_handle_t;
-                         _destroyShaders: bool): bgfx_program_handle_t {.cdecl,
+proc bgfx_create_program*(vsh: bgfx_shader_handle_t; fsh: bgfx_shader_handle_t;
+                         destroyShaders: bool): bgfx_program_handle_t {.cdecl,
     importc: "bgfx_create_program", dynlib: bgfxdll.}
 ## *
 ##  Create program with compute shader.
@@ -1766,7 +1762,7 @@ proc bgfx_create_program*(_vsh: bgfx_shader_handle_t; _fsh: bgfx_shader_handle_t
 ##
 ##
 
-proc bgfx_create_compute_program*(_csh: bgfx_shader_handle_t; _destroyShaders: bool): bgfx_program_handle_t {.
+proc bgfx_create_compute_program*(csh: bgfx_shader_handle_t; destroyShaders: bool): bgfx_program_handle_t {.
     cdecl, importc: "bgfx_create_compute_program", dynlib: bgfxdll.}
 ## *
 ##  Destroy program.
@@ -1775,112 +1771,112 @@ proc bgfx_create_compute_program*(_csh: bgfx_shader_handle_t; _destroyShaders: b
 ##
 ##
 
-proc bgfx_destroy_program*(_handle: bgfx_program_handle_t) {.cdecl,
+proc bgfx_destroy_program*(handle: bgfx_program_handle_t) {.cdecl,
     importc: "bgfx_destroy_program", dynlib: bgfxdll.}
 ## *
 ##  Validate texture parameters.
 ##
-##  @param[in] _depth Depth dimension of volume texture.
-##  @param[in] _cubeMap Indicates that texture contains cubemap.
-##  @param[in] _numLayers Number of layers in texture array.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _flags Texture flags. See `BGFX_TEXTURE_*`.
+##  @param[in] depth Depth dimension of volume texture.
+##  @param[in] cubeMap Indicates that texture contains cubemap.
+##  @param[in] numLayers Number of layers in texture array.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] flags Texture flags. See `BGFX_TEXTURE_*`.
 ##
 ##  @returns True if a texture with the same parameters can be created.
 ##
 ##
 
-proc bgfx_is_texture_valid*(_depth: uint16; _cubeMap: bool; _numLayers: uint16;
-                           _format: bgfx_texture_format_t; _flags: uint64): bool {.
+proc bgfx_is_texture_valid*(depth: uint16; cubeMap: bool; numLayers: uint16;
+                           format: bgfx_texture_format_t; flags: uint64): bool {.
     cdecl, importc: "bgfx_is_texture_valid", dynlib: bgfxdll.}
 ## *
 ##  Validate frame buffer parameters.
 ##
-##  @param[in] _num Number of attachments.
-##  @param[in] _attachment Attachment texture info. See: `bgfx::Attachment`.
+##  @param[in] num Number of attachments.
+##  @param[in] attachment Attachment texture info. See: `bgfx::Attachment`.
 ##
 ##  @returns True if a frame buffer with the same parameters can be created.
 ##
 ##
 
-proc bgfx_is_frame_buffer_valid*(_num: uint8; _attachment: ptr bgfx_attachment_t): bool {.
+proc bgfx_is_frame_buffer_valid*(num: uint8; attachment: ptr bgfx_attachment_t): bool {.
     cdecl, importc: "bgfx_is_frame_buffer_valid", dynlib: bgfxdll.}
 ## *
 ##  Calculate amount of memory required for texture.
 ##
 ##  @param[out] _info Resulting texture info structure. See: `TextureInfo`.
-##  @param[in] _width Width.
-##  @param[in] _height Height.
-##  @param[in] _depth Depth dimension of volume texture.
-##  @param[in] _cubeMap Indicates that texture contains cubemap.
-##  @param[in] _hasMips Indicates that texture contains full mip-map chain.
-##  @param[in] _numLayers Number of layers in texture array.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] width Width.
+##  @param[in] height Height.
+##  @param[in] depth Depth dimension of volume texture.
+##  @param[in] cubeMap Indicates that texture contains cubemap.
+##  @param[in] hasMips Indicates that texture contains full mip-map chain.
+##  @param[in] numLayers Number of layers in texture array.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
 ##
 ##
 
-proc bgfx_calc_texture_size*(_info: ptr bgfx_texture_info_t; _width: uint16;
-                            _height: uint16; _depth: uint16; _cubeMap: bool;
-                            _hasMips: bool; _numLayers: uint16;
-                            _format: bgfx_texture_format_t) {.cdecl,
+proc bgfx_calc_texture_size*(info: ptr bgfx_texture_info_t; width: uint16;
+                            height: uint16; depth: uint16; cubeMap: bool;
+                            hasMips: bool; numLayers: uint16;
+                            format: bgfx_texture_format_t) {.cdecl,
     importc: "bgfx_calc_texture_size", dynlib: bgfxdll.}
 ## *
 ##  Create texture from memory buffer.
 ##
-##  @param[in] _mem DDS, KTX or PVR texture binary data.
-##  @param[in] _flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] mem DDS, KTX or PVR texture binary data.
+##  @param[in] flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
 ##   - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic
 ##     sampling.
-##  @param[in] _skip Skip top level mips when parsing texture.
-##  @param[out] _info When non-`NULL` is specified it returns parsed texture information.
+##  @param[in] skip Skip top level mips when parsing texture.
+##  @param[out] info When non-`NULL` is specified it returns parsed texture information.
 ##
 ##  @returns Texture handle.
 ##
 ##
 
-proc bgfx_create_texture*(_mem: ptr bgfx_memory_t; _flags: uint64; _skip: uint8;
-                         _info: ptr bgfx_texture_info_t): bgfx_texture_handle_t {.
+proc bgfx_create_texture*(mem: ptr bgfx_memory_t; flags: uint64; skip: uint8;
+                         info: ptr bgfx_texture_info_t): bgfx_texture_handle_t {.
     cdecl, importc: "bgfx_create_texture", dynlib: bgfxdll.}
 ## *
 ##  Create 2D texture.
 ##
-##  @param[in] _width Width.
-##  @param[in] _height Height.
-##  @param[in] _hasMips Indicates that texture contains full mip-map chain.
-##  @param[in] _numLayers Number of layers in texture array. Must be 1 if caps
+##  @param[in] width Width.
+##  @param[in] height Height.
+##  @param[in] hasMips Indicates that texture contains full mip-map chain.
+##  @param[in] numLayers Number of layers in texture array. Must be 1 if caps
 ##   `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
 ##   - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic
 ##     sampling.
-##  @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
-##   `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
+##  @param[in] mem Texture data. If `mem` is non-NULL, created texture will be immutable. If
+##   `mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 ##   1, expected memory layout is texture and all mips together for each array element.
 ##
 ##  @returns Texture handle.
 ##
 ##
 
-proc bgfx_create_texture_2d*(_width: uint16; _height: uint16; _hasMips: bool;
-                            _numLayers: uint16; _format: bgfx_texture_format_t;
-                            _flags: uint64; _mem: ptr bgfx_memory_t): bgfx_texture_handle_t {.
+proc bgfx_create_texture_2d*(width: uint16; height: uint16; hasMips: bool;
+                            numLayers: uint16; format: bgfx_texture_format_t;
+                            flags: uint64; mem: ptr bgfx_memory_t): bgfx_texture_handle_t {.
     cdecl, importc: "bgfx_create_texture_2d", dynlib: bgfxdll.}
 ## *
 ##  Create texture with size based on back-buffer ratio. Texture will maintain ratio
 ##  if back buffer resolution changes.
 ##
-##  @param[in] _ratio Texture size in respect to back-buffer size. See: `BackbufferRatio::Enum`.
-##  @param[in] _hasMips Indicates that texture contains full mip-map chain.
-##  @param[in] _numLayers Number of layers in texture array. Must be 1 if caps
+##  @param[in] ratio Texture size in respect to back-buffer size. See: `BackbufferRatio::Enum`.
+##  @param[in] hasMips Indicates that texture contains full mip-map chain.
+##  @param[in] numLayers Number of layers in texture array. Must be 1 if caps
 ##   `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
@@ -1891,105 +1887,105 @@ proc bgfx_create_texture_2d*(_width: uint16; _height: uint16; _hasMips: bool;
 ##
 ##
 
-proc bgfx_create_texture_2d_scaled*(_ratio: bgfx_backbuffer_ratio_t;
-                                   _hasMips: bool; _numLayers: uint16;
-                                   _format: bgfx_texture_format_t;
-                                   _flags: uint64): bgfx_texture_handle_t {.
+proc bgfx_create_texture_2d_scaled*(ratio: bgfx_backbuffer_ratio_t;
+                                   hasMips: bool; numLayers: uint16;
+                                   format: bgfx_texture_format_t;
+                                   flags: uint64): bgfx_texture_handle_t {.
     cdecl, importc: "bgfx_create_texture_2d_scaled", dynlib: bgfxdll.}
 ## *
 ##  Create 3D texture.
 ##
-##  @param[in] _width Width.
-##  @param[in] _height Height.
-##  @param[in] _depth Depth.
-##  @param[in] _hasMips Indicates that texture contains full mip-map chain.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] width Width.
+##  @param[in] height Height.
+##  @param[in] depth Depth.
+##  @param[in] hasMips Indicates that texture contains full mip-map chain.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
 ##   - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic
 ##     sampling.
-##  @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
-##   `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
+##  @param[in] mem Texture data. If `mem` is non-NULL, created texture will be immutable. If
+##   `mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 ##   1, expected memory layout is texture and all mips together for each array element.
 ##
 ##  @returns Texture handle.
 ##
 ##
 
-proc bgfx_create_texture_3d*(_width: uint16; _height: uint16; _depth: uint16;
-                            _hasMips: bool; _format: bgfx_texture_format_t;
-                            _flags: uint64; _mem: ptr bgfx_memory_t): bgfx_texture_handle_t {.
+proc bgfx_create_texture_3d*(width: uint16; height: uint16; depth: uint16;
+                            hasMips: bool; format: bgfx_texture_format_t;
+                            flags: uint64; mem: ptr bgfx_memory_t): bgfx_texture_handle_t {.
     cdecl, importc: "bgfx_create_texture_3d", dynlib: bgfxdll.}
 ## *
 ##  Create Cube texture.
 ##
-##  @param[in] _size Cube side size.
-##  @param[in] _hasMips Indicates that texture contains full mip-map chain.
-##  @param[in] _numLayers Number of layers in texture array. Must be 1 if caps
+##  @param[in] size Cube side size.
+##  @param[in] hasMips Indicates that texture contains full mip-map chain.
+##  @param[in] numLayers Number of layers in texture array. Must be 1 if caps
 ##   `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
 ##   - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic
 ##     sampling.
-##  @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
-##   `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
+##  @param[in] mem Texture data. If `mem` is non-NULL, created texture will be immutable. If
+##   `mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 ##   1, expected memory layout is texture and all mips together for each array element.
 ##
 ##  @returns Texture handle.
 ##
 ##
 
-proc bgfx_create_texture_cube*(_size: uint16; _hasMips: bool; _numLayers: uint16;
-                              _format: bgfx_texture_format_t; _flags: uint64;
-                              _mem: ptr bgfx_memory_t): bgfx_texture_handle_t {.
+proc bgfx_create_texture_cube*(size: uint16; hasMips: bool; numLayers: uint16;
+                              format: bgfx_texture_format_t; flags: uint64;
+                              mem: ptr bgfx_memory_t): bgfx_texture_handle_t {.
     cdecl, importc: "bgfx_create_texture_cube", dynlib: bgfxdll.}
 ## *
 ##  Update 2D texture.
 ##  @attention It's valid to update only mutable texture. See `bgfx::createTexture2D` for more info.
 ##
-##  @param[in] _handle Texture handle.
-##  @param[in] _layer Layer in texture array.
-##  @param[in] _mip Mip level.
-##  @param[in] _x X offset in texture.
-##  @param[in] _y Y offset in texture.
-##  @param[in] _width Width of texture block.
-##  @param[in] _height Height of texture block.
-##  @param[in] _mem Texture update data.
-##  @param[in] _pitch Pitch of input image (bytes). When _pitch is set to
-##   UINT16_MAX, it will be calculated internally based on _width.
+##  @param[in] handle Texture handle.
+##  @param[in] layer Layer in texture array.
+##  @param[in] mip Mip level.
+##  @param[in] x X offset in texture.
+##  @param[in] y Y offset in texture.
+##  @param[in] width Width of texture block.
+##  @param[in] height Height of texture block.
+##  @param[in] mem Texture update data.
+##  @param[in] pitch Pitch of input image (bytes). When pitch is set to
+##   UINT16_MAX, it will be calculated internally based on width.
 ##
 ##
 
-proc bgfx_update_texture_2d*(_handle: bgfx_texture_handle_t; _layer: uint16;
-                            _mip: uint8; _x: uint16; _y: uint16;
-                            _width: uint16; _height: uint16;
-                            _mem: ptr bgfx_memory_t; _pitch: uint16) {.cdecl,
+proc bgfx_update_texture_2d*(handle: bgfx_texture_handle_t; layer: uint16;
+                            mip: uint8; x: uint16; y: uint16;
+                            width: uint16; height: uint16;
+                            mem: ptr bgfx_memory_t; pitch: uint16) {.cdecl,
     importc: "bgfx_update_texture_2d", dynlib: bgfxdll.}
 ## *
 ##  Update 3D texture.
 ##  @attention It's valid to update only mutable texture. See `bgfx::createTexture3D` for more info.
 ##
-##  @param[in] _handle Texture handle.
-##  @param[in] _mip Mip level.
-##  @param[in] _x X offset in texture.
-##  @param[in] _y Y offset in texture.
-##  @param[in] _z Z offset in texture.
-##  @param[in] _width Width of texture block.
-##  @param[in] _height Height of texture block.
-##  @param[in] _depth Depth of texture block.
-##  @param[in] _mem Texture update data.
+##  @param[in] handle Texture handle.
+##  @param[in] mip Mip level.
+##  @param[in] x X offset in texture.
+##  @param[in] y Y offset in texture.
+##  @param[in] z Z offset in texture.
+##  @param[in] width Width of texture block.
+##  @param[in] height Height of texture block.
+##  @param[in] depth Depth of texture block.
+##  @param[in] mem Texture update data.
 ##
 ##
 
-proc bgfx_update_texture_3d*(_handle: bgfx_texture_handle_t; _mip: uint8;
-                            _x: uint16; _y: uint16; _z: uint16;
-                            _width: uint16; _height: uint16; _depth: uint16;
-                            _mem: ptr bgfx_memory_t) {.cdecl,
+proc bgfx_update_texture_3d*(handle: bgfx_texture_handle_t; mip: uint8;
+                            x: uint16; y: uint16; z: uint16;
+                            width: uint16; height: uint16; depth: uint16;
+                            mem: ptr bgfx_memory_t) {.cdecl,
     importc: "bgfx_update_texture_3d", dynlib: bgfxdll.}
 ## *
 ##  Update Cube texture.
@@ -2015,49 +2011,49 @@ proc bgfx_update_texture_3d*(_handle: bgfx_texture_handle_t; _mip: uint8;
 ##                    | |        |
 ##                    | +---->+x |
 ##                    +----------+
-##  @param[in] _mip Mip level.
-##  @param[in] _x X offset in texture.
-##  @param[in] _y Y offset in texture.
-##  @param[in] _width Width of texture block.
-##  @param[in] _height Height of texture block.
-##  @param[in] _mem Texture update data.
-##  @param[in] _pitch Pitch of input image (bytes). When _pitch is set to
-##   UINT16_MAX, it will be calculated internally based on _width.
+##  @param[in] mip Mip level.
+##  @param[in] x X offset in texture.
+##  @param[in] y Y offset in texture.
+##  @param[in] width Width of texture block.
+##  @param[in] height Height of texture block.
+##  @param[in] mem Texture update data.
+##  @param[in] pitch Pitch of input image (bytes). When pitch is set to
+##   UINT16_MAX, it will be calculated internally based on width.
 ##
 ##
 
-proc bgfx_update_texture_cube*(_handle: bgfx_texture_handle_t; _layer: uint16;
-                              _side: uint8; _mip: uint8; _x: uint16;
-                              _y: uint16; _width: uint16; _height: uint16;
-                              _mem: ptr bgfx_memory_t; _pitch: uint16) {.cdecl,
+proc bgfx_update_texture_cube*(handle: bgfx_texture_handle_t; layer: uint16;
+                              side: uint8; mip: uint8; x: uint16;
+                              y: uint16; width: uint16; height: uint16;
+                              mem: ptr bgfx_memory_t; pitch: uint16) {.cdecl,
     importc: "bgfx_update_texture_cube", dynlib: bgfxdll.}
 ## *
 ##  Read back texture content.
 ##  @attention Texture must be created with `BGFX_TEXTURE_READ_BACK` flag.
 ##  @attention Availability depends on: `BGFX_CAPS_TEXTURE_READ_BACK`.
 ##
-##  @param[in] _handle Texture handle.
-##  @param[in] _data Destination buffer.
-##  @param[in] _mip Mip level.
+##  @param[in] handle Texture handle.
+##  @param[in] data Destination buffer.
+##  @param[in] mip Mip level.
 ##
 ##  @returns Frame number when the result will be available. See: `bgfx::frame`.
 ##
 ##
 
-proc bgfx_read_texture*(_handle: bgfx_texture_handle_t; _data: pointer; _mip: uint8): uint32 {.
+proc bgfx_read_texture*(handle: bgfx_texture_handle_t; data: pointer; mip: uint8): uint32 {.
     cdecl, importc: "bgfx_read_texture", dynlib: bgfxdll.}
 ## *
 ##  Set texture debug name.
 ##
-##  @param[in] _handle Texture handle.
-##  @param[in] _name Texture name.
-##  @param[in] _len Texture name length (if length is INT32_MAX, it's expected
-##   that _name is zero terminated string.
+##  @param[in] handle Texture handle.
+##  @param[in] name Texture name.
+##  @param[in] len Texture name length (if length is INT32_MAX, it's expected
+##   that name is zero terminated string.
 ##
 ##
 
-proc bgfx_set_texture_name*(_handle: bgfx_texture_handle_t; _name: cstring;
-                           _len: int32_t) {.cdecl,
+proc bgfx_set_texture_name*(handle: bgfx_texture_handle_t; name: cstring;
+                           len: int32) {.cdecl,
     importc: "bgfx_set_texture_name", dynlib: bgfxdll.}
 ## *
 ##  Returns texture direct access pointer.
@@ -2073,7 +2069,7 @@ proc bgfx_set_texture_name*(_handle: bgfx_texture_handle_t; _name: cstring;
 ##
 ##
 
-proc bgfx_get_direct_access_ptr*(_handle: bgfx_texture_handle_t): pointer {.cdecl,
+proc bgfx_get_direct_access_ptr*(handle: bgfx_texture_handle_t): pointer {.cdecl,
     importc: "bgfx_get_direct_access_ptr", dynlib: bgfxdll.}
 ## *
 ##  Destroy texture.
@@ -2082,15 +2078,15 @@ proc bgfx_get_direct_access_ptr*(_handle: bgfx_texture_handle_t): pointer {.cdec
 ##
 ##
 
-proc bgfx_destroy_texture*(_handle: bgfx_texture_handle_t) {.cdecl,
+proc bgfx_destroy_texture*(handle: bgfx_texture_handle_t) {.cdecl,
     importc: "bgfx_destroy_texture", dynlib: bgfxdll.}
 ## *
 ##  Create frame buffer (simple).
 ##
-##  @param[in] _width Texture width.
-##  @param[in] _height Texture height.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _textureFlags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] width Texture width.
+##  @param[in] height Texture height.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] textureFlags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
@@ -2101,18 +2097,18 @@ proc bgfx_destroy_texture*(_handle: bgfx_texture_handle_t) {.cdecl,
 ##
 ##
 
-proc bgfx_create_frame_buffer*(_width: uint16; _height: uint16;
-                              _format: bgfx_texture_format_t;
-                              _textureFlags: uint64): bgfx_frame_buffer_handle_t {.
+proc bgfx_create_frame_buffer*(width: uint16; height: uint16;
+                              format: bgfx_texture_format_t;
+                              textureFlags: uint64): bgfx_frame_buffer_handle_t {.
     cdecl, importc: "bgfx_create_frame_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create frame buffer with size based on back-buffer ratio. Frame buffer will maintain ratio
 ##  if back buffer resolution changes.
 ##
-##  @param[in] _ratio Frame buffer size in respect to back-buffer size. See:
+##  @param[in] ratio Frame buffer size in respect to back-buffer size. See:
 ##   `BackbufferRatio::Enum`.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _textureFlags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] textureFlags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
@@ -2123,40 +2119,40 @@ proc bgfx_create_frame_buffer*(_width: uint16; _height: uint16;
 ##
 ##
 
-proc bgfx_create_frame_buffer_scaled*(_ratio: bgfx_backbuffer_ratio_t;
-                                     _format: bgfx_texture_format_t;
-                                     _textureFlags: uint64): bgfx_frame_buffer_handle_t {.
+proc bgfx_create_frame_buffer_scaled*(ratio: bgfx_backbuffer_ratio_t;
+                                     format: bgfx_texture_format_t;
+                                     textureFlags: uint64): bgfx_frame_buffer_handle_t {.
     cdecl, importc: "bgfx_create_frame_buffer_scaled", dynlib: bgfxdll.}
 ## *
 ##  Create MRT frame buffer from texture handles (simple).
 ##
-##  @param[in] _num Number of texture handles.
-##  @param[in] _handles Texture attachments.
-##  @param[in] _destroyTexture If true, textures will be destroyed when
+##  @param[in] num Number of texture handles.
+##  @param[in] handles Texture attachments.
+##  @param[in] destroyTexture If true, textures will be destroyed when
 ##   frame buffer is destroyed.
 ##
 ##  @returns Frame buffer handle.
 ##
 ##
 
-proc bgfx_create_frame_buffer_from_handles*(_num: uint8;
-    _handles: ptr bgfx_texture_handle_t; _destroyTexture: bool): bgfx_frame_buffer_handle_t {.
+proc bgfx_create_frame_buffer_from_handles*(num: uint8;
+    handles: ptr bgfx_texture_handle_t; destroyTexture: bool): bgfx_frame_buffer_handle_t {.
     cdecl, importc: "bgfx_create_frame_buffer_from_handles", dynlib: bgfxdll.}
 ## *
 ##  Create MRT frame buffer from texture handles with specific layer and
 ##  mip level.
 ##
-##  @param[in] _num Number of attachments.
-##  @param[in] _attachment Attachment texture info. See: `bgfx::Attachment`.
-##  @param[in] _destroyTexture If true, textures will be destroyed when
+##  @param[in] num Number of attachments.
+##  @param[in] attachment Attachment texture info. See: `bgfx::Attachment`.
+##  @param[in] destroyTexture If true, textures will be destroyed when
 ##   frame buffer is destroyed.
 ##
 ##  @returns Frame buffer handle.
 ##
 ##
 
-proc bgfx_create_frame_buffer_from_attachment*(_num: uint8;
-    _attachment: ptr bgfx_attachment_t; _destroyTexture: bool): bgfx_frame_buffer_handle_t {.
+proc bgfx_create_frame_buffer_from_attachment*(num: uint8;
+    attachment: ptr bgfx_attachment_t; destroyTexture: bool): bgfx_frame_buffer_handle_t {.
     cdecl, importc: "bgfx_create_frame_buffer_from_attachment", dynlib: bgfxdll.}
 ## *
 ##  Create frame buffer for multiple window rendering.
@@ -2164,33 +2160,33 @@ proc bgfx_create_frame_buffer_from_attachment*(_num: uint8;
 ##    Frame buffer cannot be used for sampling.
 ##  @attention Availability depends on: `BGFX_CAPS_SWAP_CHAIN`.
 ##
-##  @param[in] _nwh OS' target native window handle.
-##  @param[in] _width Window back buffer width.
-##  @param[in] _height Window back buffer height.
-##  @param[in] _format Window back buffer color format.
-##  @param[in] _depthFormat Window back buffer depth format.
+##  @param[in] nwh OS' target native window handle.
+##  @param[in] width Window back buffer width.
+##  @param[in] height Window back buffer height.
+##  @param[in] format Window back buffer color format.
+##  @param[in] depthFormat Window back buffer depth format.
 ##
 ##  @returns Frame buffer handle.
 ##
 ##
 
-proc bgfx_create_frame_buffer_from_nwh*(_nwh: pointer; _width: uint16;
-                                       _height: uint16;
-                                       _format: bgfx_texture_format_t;
-                                       _depthFormat: bgfx_texture_format_t): bgfx_frame_buffer_handle_t {.
+proc bgfx_create_frame_buffer_from_nwh*(nwh: pointer; width: uint16;
+                                       height: uint16;
+                                       format: bgfx_texture_format_t;
+                                       depthFormat: bgfx_texture_format_t): bgfx_frame_buffer_handle_t {.
     cdecl, importc: "bgfx_create_frame_buffer_from_nwh", dynlib: bgfxdll.}
 ## *
 ##  Set frame buffer debug name.
 ##
-##  @param[in] _handle Frame buffer handle.
-##  @param[in] _name Frame buffer name.
-##  @param[in] _len Frame buffer name length (if length is INT32_MAX, it's expected
-##   that _name is zero terminated string.
+##  @param[in] handle Frame buffer handle.
+##  @param[in] name Frame buffer name.
+##  @param[in] len Frame buffer name length (if length is INT32_MAX, it's expected
+##   that name is zero terminated string.
 ##
 ##
 
-proc bgfx_set_frame_buffer_name*(_handle: bgfx_frame_buffer_handle_t;
-                                _name: cstring; _len: int32_t) {.cdecl,
+proc bgfx_set_frame_buffer_name*(handle: bgfx_frame_buffer_handle_t;
+                                name: cstring; len: int32) {.cdecl,
     importc: "bgfx_set_frame_buffer_name", dynlib: bgfxdll.}
 ## *
 ##  Obtain texture handle of frame buffer attachment.
@@ -2200,7 +2196,7 @@ proc bgfx_set_frame_buffer_name*(_handle: bgfx_frame_buffer_handle_t;
 ##
 ##
 
-proc bgfx_get_texture*(_handle: bgfx_frame_buffer_handle_t; _attachment: uint8): bgfx_texture_handle_t {.
+proc bgfx_get_texture*(handle: bgfx_frame_buffer_handle_t; attachment: uint8): bgfx_texture_handle_t {.
     cdecl, importc: "bgfx_get_texture", dynlib: bgfxdll.}
 ## *
 ##  Destroy frame buffer.
@@ -2209,7 +2205,7 @@ proc bgfx_get_texture*(_handle: bgfx_frame_buffer_handle_t; _attachment: uint8):
 ##
 ##
 
-proc bgfx_destroy_frame_buffer*(_handle: bgfx_frame_buffer_handle_t) {.cdecl,
+proc bgfx_destroy_frame_buffer*(handle: bgfx_frame_buffer_handle_t) {.cdecl,
     importc: "bgfx_destroy_frame_buffer", dynlib: bgfxdll.}
 ## *
 ##  Create shader uniform parameter.
@@ -2236,9 +2232,9 @@ proc bgfx_destroy_frame_buffer*(_handle: bgfx_frame_buffer_handle_t) {.cdecl,
 ##       - `u_modelViewProj mat4` - concatenated model view projection matrix.
 ##       - `u_alphaRef float` - alpha reference value for alpha test.
 ##
-##  @param[in] _name Uniform name in shader.
-##  @param[in] _type Type of uniform (See: `bgfx::UniformType`).
-##  @param[in] _num Number of elements in array.
+##  @param[in] name Uniform name in shader.
+##  @param[in] type Type of uniform (See: `bgfx::UniformType`).
+##  @param[in] num Number of elements in array.
 ##
 ##  @returns Handle to uniform object.
 ##
@@ -2249,22 +2245,22 @@ proc bgfx_create_uniform*(_name: cstring; _type: bgfx_uniform_type_t; _num: uint
 ## *
 ##  Retrieve uniform info.
 ##
-##  @param[in] _handle Handle to uniform object.
-##  @param[out] _info Uniform info.
+##  @param[in] handle Handle to uniform object.
+##  @param[out] info Uniform info.
 ##
 ##
 
-proc bgfx_get_uniform_info*(_handle: bgfx_uniform_handle_t;
-                           _info: ptr bgfx_uniform_info_t) {.cdecl,
+proc bgfx_get_uniform_info*(handle: bgfx_uniform_handle_t;
+                           info: ptr bgfx_uniform_info_t) {.cdecl,
     importc: "bgfx_get_uniform_info", dynlib: bgfxdll.}
 ## *
 ##  Destroy shader uniform parameter.
 ##
-##  @param[in] _handle Handle to uniform object.
+##  @param[in] handle Handle to uniform object.
 ##
 ##
 
-proc bgfx_destroy_uniform*(_handle: bgfx_uniform_handle_t) {.cdecl,
+proc bgfx_destroy_uniform*(handle: bgfx_uniform_handle_t) {.cdecl,
     importc: "bgfx_destroy_uniform", dynlib: bgfxdll.}
 ## *
 ##  Create occlusion query.
@@ -2276,15 +2272,15 @@ proc bgfx_create_occlusion_query*(): bgfx_occlusion_query_handle_t {.cdecl,
 ## *
 ##  Retrieve occlusion query result from previous frame.
 ##
-##  @param[in] _handle Handle to occlusion query object.
-##  @param[out] _result Number of pixels that passed test. This argument
+##  @param[in] handle Handle to occlusion query object.
+##  @param[out] result Number of pixels that passed test. This argument
 ##   can be `NULL` if result of occlusion query is not needed.
 ##
 ##  @returns Occlusion query result.
 ##
 ##
 
-proc bgfx_get_result*(_handle: bgfx_occlusion_query_handle_t; _result: ptr int32_t): bgfx_occlusion_query_result_t {.
+proc bgfx_get_result*(handle: bgfx_occlusion_query_handle_t; result: ptr int32): bgfx_occlusion_query_result_t {.
     cdecl, importc: "bgfx_get_result", dynlib: bgfxdll.}
 ## *
 ##  Destroy occlusion query.
@@ -2293,27 +2289,27 @@ proc bgfx_get_result*(_handle: bgfx_occlusion_query_handle_t; _result: ptr int32
 ##
 ##
 
-proc bgfx_destroy_occlusion_query*(_handle: bgfx_occlusion_query_handle_t) {.cdecl,
+proc bgfx_destroy_occlusion_query*(handle: bgfx_occlusion_query_handle_t) {.cdecl,
     importc: "bgfx_destroy_occlusion_query", dynlib: bgfxdll.}
 ## *
 ##  Set palette color value.
 ##
-##  @param[in] _index Index into palette.
-##  @param[in] _rgba RGBA floating point values.
+##  @param[in] index Index into palette.
+##  @param[in] rgba RGBA floating point values.
 ##
 ##
 
-proc bgfx_set_palette_color*(_index: uint8; _rgba: array[4, cfloat]) {.cdecl,
+proc bgfx_set_palette_color*(index: uint8; rgba: array[4, cfloat]) {.cdecl,
     importc: "bgfx_set_palette_color", dynlib: bgfxdll.}
 ## *
 ##  Set palette color value.
 ##
-##  @param[in] _index Index into palette.
-##  @param[in] _rgba Packed 32-bit RGBA value.
+##  @param[in] index Index into palette.
+##  @param[in] rgba Packed 32-bit RGBA value.
 ##
 ##
 
-proc bgfx_set_palette_color_rgba8*(_index: uint8; _rgba: uint32) {.cdecl,
+proc bgfx_set_palette_color_rgba8*(index: uint8; rgba: uint32) {.cdecl,
     importc: "bgfx_set_palette_color_rgba8", dynlib: bgfxdll.}
 ## *
 ##  Set view name.
@@ -2325,157 +2321,157 @@ proc bgfx_set_palette_color_rgba8*(_index: uint8; _rgba: uint32) {.cdecl,
 ##         |  +--- compute (C)
 ##         +------ view id
 ##
-##  @param[in] _id View id.
-##  @param[in] _name View name.
+##  @param[in] id View id.
+##  @param[in] name View name.
 ##
 ##
 
-proc bgfx_set_view_name*(_id: bgfx_view_id_t; _name: cstring) {.cdecl,
+proc bgfx_set_view_name*(id: bgfx_view_id_t; name: cstring) {.cdecl,
     importc: "bgfx_set_view_name", dynlib: bgfxdll.}
 ## *
 ##  Set view rectangle. Draw primitive outside view will be clipped.
 ##
-##  @param[in] _id View id.
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _width Width of view port region.
-##  @param[in] _height Height of view port region.
+##  @param[in] id View id.
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] width Width of view port region.
+##  @param[in] height Height of view port region.
 ##
 ##
 
-proc bgfx_set_view_rect*(_id: bgfx_view_id_t; _x: uint16; _y: uint16;
-                        _width: uint16; _height: uint16) {.cdecl,
+proc bgfx_set_view_rect*(id: bgfx_view_id_t; x: uint16; y: uint16;
+                        width: uint16; height: uint16) {.cdecl,
     importc: "bgfx_set_view_rect", dynlib: bgfxdll.}
 ## *
 ##  Set view rectangle. Draw primitive outside view will be clipped.
 ##
-##  @param[in] _id View id.
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _ratio Width and height will be set in respect to back-buffer size.
+##  @param[in] id View id.
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] ratio Width and height will be set in respect to back-buffer size.
 ##   See: `BackbufferRatio::Enum`.
 ##
 ##
 
-proc bgfx_set_view_rect_ratio*(_id: bgfx_view_id_t; _x: uint16; _y: uint16;
-                              _ratio: bgfx_backbuffer_ratio_t) {.cdecl,
+proc bgfx_set_view_rect_ratio*(id: bgfx_view_id_t; x: uint16; y: uint16;
+                              ratio: bgfx_backbuffer_ratio_t) {.cdecl,
     importc: "bgfx_set_view_rect_ratio", dynlib: bgfxdll.}
 ## *
 ##  Set view scissor. Draw primitive outside view will be clipped. When
-##  _x, _y, _width and _height are set to 0, scissor will be disabled.
+##  x, y, width and height are set to 0, scissor will be disabled.
 ##
-##  @param[in] _id View id.
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _width Width of view scissor region.
-##  @param[in] _height Height of view scissor region.
+##  @param[in] id View id.
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] width Width of view scissor region.
+##  @param[in] height Height of view scissor region.
 ##
 ##
 
-proc bgfx_set_view_scissor*(_id: bgfx_view_id_t; _x: uint16; _y: uint16;
-                           _width: uint16; _height: uint16) {.cdecl,
+proc bgfx_set_view_scissor*(id: bgfx_view_id_t; x: uint16; y: uint16;
+                           width: uint16; height: uint16) {.cdecl,
     importc: "bgfx_set_view_scissor", dynlib: bgfxdll.}
 ## *
 ##  Set view clear flags.
 ##
-##  @param[in] _id View id.
-##  @param[in] _flags Clear flags. Use `BGFX_CLEAR_NONE` to remove any clear
+##  @param[in] id View id.
+##  @param[in] flags Clear flags. Use `BGFX_CLEAR_NONE` to remove any clear
 ##   operation. See: `BGFX_CLEAR_*`.
-##  @param[in] _rgba Color clear value.
-##  @param[in] _depth Depth clear value.
-##  @param[in] _stencil Stencil clear value.
+##  @param[in] rgba Color clear value.
+##  @param[in] depth Depth clear value.
+##  @param[in] stencil Stencil clear value.
 ##
 ##
 
-proc bgfx_set_view_clear*(_id: bgfx_view_id_t; _flags: uint16; _rgba: uint32;
-                         _depth: cfloat; _stencil: uint8) {.cdecl,
+proc bgfx_set_view_clear*(id: bgfx_view_id_t; flags: uint16; rgba: uint32;
+                         depth: cfloat; stencil: uint8) {.cdecl,
     importc: "bgfx_set_view_clear", dynlib: bgfxdll.}
 ## *
 ##  Set view clear flags with different clear color for each
 ##  frame buffer texture. `bgfx::setPaletteColor` must be used to set up a
 ##  clear color palette.
 ##
-##  @param[in] _id View id.
-##  @param[in] _flags Clear flags. Use `BGFX_CLEAR_NONE` to remove any clear
+##  @param[in] id View id.
+##  @param[in] flags Clear flags. Use `BGFX_CLEAR_NONE` to remove any clear
 ##   operation. See: `BGFX_CLEAR_*`.
-##  @param[in] _depth Depth clear value.
-##  @param[in] _stencil Stencil clear value.
-##  @param[in] _c0 Palette index for frame buffer attachment 0.
-##  @param[in] _c1 Palette index for frame buffer attachment 1.
-##  @param[in] _c2 Palette index for frame buffer attachment 2.
-##  @param[in] _c3 Palette index for frame buffer attachment 3.
-##  @param[in] _c4 Palette index for frame buffer attachment 4.
-##  @param[in] _c5 Palette index for frame buffer attachment 5.
-##  @param[in] _c6 Palette index for frame buffer attachment 6.
-##  @param[in] _c7 Palette index for frame buffer attachment 7.
+##  @param[in] depth Depth clear value.
+##  @param[in] stencil Stencil clear value.
+##  @param[in] c0 Palette index for frame buffer attachment 0.
+##  @param[in] c1 Palette index for frame buffer attachment 1.
+##  @param[in] c2 Palette index for frame buffer attachment 2.
+##  @param[in] c3 Palette index for frame buffer attachment 3.
+##  @param[in] c4 Palette index for frame buffer attachment 4.
+##  @param[in] c5 Palette index for frame buffer attachment 5.
+##  @param[in] c6 Palette index for frame buffer attachment 6.
+##  @param[in] c7 Palette index for frame buffer attachment 7.
 ##
 ##
 
-proc bgfx_set_view_clear_mrt*(_id: bgfx_view_id_t; _flags: uint16; _depth: cfloat;
-                             _stencil: uint8; _c0: uint8; _c1: uint8;
-                             _c2: uint8; _c3: uint8; _c4: uint8; _c5: uint8;
-                             _c6: uint8; _c7: uint8) {.cdecl,
+proc bgfx_set_view_clear_mrt*(id: bgfx_view_id_t; flags: uint16; depth: cfloat;
+                             stencil: uint8; c0: uint8; c1: uint8;
+                             c2: uint8; c3: uint8; c4: uint8; c5: uint8;
+                             c6: uint8; c7: uint8) {.cdecl,
     importc: "bgfx_set_view_clear_mrt", dynlib: bgfxdll.}
 ## *
 ##  Set view sorting mode.
 ##  @remarks
 ##    View mode must be set prior calling `bgfx::submit` for the view.
 ##
-##  @param[in] _id View id.
-##  @param[in] _mode View sort mode. See `ViewMode::Enum`.
+##  @param[in] id View id.
+##  @param[in] mode View sort mode. See `ViewMode::Enum`.
 ##
 ##
 
-proc bgfx_set_view_mode*(_id: bgfx_view_id_t; _mode: bgfx_view_mode_t) {.cdecl,
+proc bgfx_set_view_mode*(id: bgfx_view_id_t; mode: bgfx_view_mode_t) {.cdecl,
     importc: "bgfx_set_view_mode", dynlib: bgfxdll.}
 ## *
 ##  Set view frame buffer.
 ##  @remarks
 ##    Not persistent after `bgfx::reset` call.
 ##
-##  @param[in] _id View id.
-##  @param[in] _handle Frame buffer handle. Passing `BGFX_INVALID_HANDLE` as
+##  @param[in] id View id.
+##  @param[in] handle Frame buffer handle. Passing `BGFX_INVALID_HANDLE` as
 ##   frame buffer handle will draw primitives from this view into
 ##   default back buffer.
 ##
 ##
 
-proc bgfx_set_view_frame_buffer*(_id: bgfx_view_id_t;
-                                _handle: bgfx_frame_buffer_handle_t) {.cdecl,
+proc bgfx_set_view_frame_buffer*(id: bgfx_view_id_t;
+                                handle: bgfx_frame_buffer_handle_t) {.cdecl,
     importc: "bgfx_set_view_frame_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set view's view matrix and projection matrix,
 ##  all draw primitives in this view will use these two matrices.
 ##
-##  @param[in] _id View id.
-##  @param[in] _view View matrix.
-##  @param[in] _proj Projection matrix.
+##  @param[in] id View id.
+##  @param[in] view View matrix.
+##  @param[in] proj Projection matrix.
 ##
 ##
 
-proc bgfx_set_view_transform*(_id: bgfx_view_id_t; _view: pointer; _proj: pointer) {.
+proc bgfx_set_view_transform*(id: bgfx_view_id_t; view: pointer; proj: pointer) {.
     cdecl, importc: "bgfx_set_view_transform", dynlib: bgfxdll.}
 ## *
 ##  Post submit view reordering.
 ##
-##  @param[in] _id First view id.
-##  @param[in] _num Number of views to remap.
-##  @param[in] _order View remap id table. Passing `NULL` will reset view ids
+##  @param[in] id First view id.
+##  @param[in] num Number of views to remap.
+##  @param[in] order View remap id table. Passing `NULL` will reset view ids
 ##   to default state.
 ##
 ##
 
-proc bgfx_set_view_order*(_id: bgfx_view_id_t; _num: uint16;
-                         _order: ptr bgfx_view_id_t) {.cdecl,
+proc bgfx_set_view_order*(id: bgfx_view_id_t; num: uint16;
+                         order: ptr bgfx_view_id_t) {.cdecl,
     importc: "bgfx_set_view_order", dynlib: bgfxdll.}
 ## *
 ##  Reset all view settings to default.
 ##
-##  @param[in] _id
+##  @param[in] id
 ##
 ##
 
-proc bgfx_reset_view*(_id: bgfx_view_id_t) {.cdecl, importc: "bgfx_reset_view",
+proc bgfx_reset_view*(id: bgfx_view_id_t) {.cdecl, importc: "bgfx_reset_view",
     dynlib: bgfxdll.}
 ## *
 ##  Begin submitting draw calls from thread.
@@ -2486,7 +2482,7 @@ proc bgfx_reset_view*(_id: bgfx_view_id_t) {.cdecl, importc: "bgfx_reset_view",
 ##
 ##
 
-proc bgfx_encoder_begin*(_forThread: bool): ptr bgfx_encoder_t {.cdecl,
+proc bgfx_encoder_begin*(forThread: bool): ptr bgfx_encoder_t {.cdecl,
     importc: "bgfx_encoder_begin", dynlib: bgfxdll.}
 ## *
 ##  End submitting draw calls from thread.
@@ -2495,7 +2491,7 @@ proc bgfx_encoder_begin*(_forThread: bool): ptr bgfx_encoder_t {.cdecl,
 ##
 ##
 
-proc bgfx_encoder_end*(_encoder: ptr bgfx_encoder_t) {.cdecl,
+proc bgfx_encoder_end*(encoder: ptr bgfx_encoder_t) {.cdecl,
     importc: "bgfx_encoder_end", dynlib: bgfxdll.}
 ## *
 ##  Sets a debug marker. This allows you to group graphics calls together for easy browsing in
@@ -2505,18 +2501,18 @@ proc bgfx_encoder_end*(_encoder: ptr bgfx_encoder_t) {.cdecl,
 ##
 ##
 
-proc bgfx_encoder_set_marker*(_this: ptr bgfx_encoder_t; _marker: cstring) {.cdecl,
+proc bgfx_encoder_set_marker*(this: ptr bgfx_encoder_t; marker: cstring) {.cdecl,
     importc: "bgfx_encoder_set_marker", dynlib: bgfxdll.}
 ## *
 ##  Set render states for draw primitive.
 ##  @remarks
 ##    1. To set up more complex states use:
-##       `BGFX_STATE_ALPHA_REF(_ref)`,
-##       `BGFX_STATE_POINT_SIZE(_size)`,
-##       `BGFX_STATE_BLEND_FUNC(_src, _dst)`,
-##       `BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA)`,
-##       `BGFX_STATE_BLEND_EQUATION(_equation)`,
-##       `BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)`
+##       `BGFX_STATE_ALPHA_REF(ref)`,
+##       `BGFX_STATE_POINT_SIZE(size)`,
+##       `BGFX_STATE_BLEND_FUNC(src, dst)`,
+##       `BGFX_STATE_BLEND_FUNC_SEPARATE(srcRGB, dstRGB, srcA, dstA)`,
+##       `BGFX_STATE_BLEND_EQUATION(equation)`,
+##       `BGFX_STATE_BLEND_EQUATION_SEPARATE(equationRGB, equationA)`
 ##    2. `BGFX_STATE_BLEND_EQUATION_ADD` is set when no other blend
 ##       equation is specified.
 ##
@@ -2534,8 +2530,8 @@ proc bgfx_encoder_set_marker*(_this: ptr bgfx_encoder_t; _marker: cstring) {.cde
 ##
 ##
 
-proc bgfx_encoder_set_state*(_this: ptr bgfx_encoder_t; _state: uint64;
-                            _rgba: uint32) {.cdecl,
+proc bgfx_encoder_set_state*(this: ptr bgfx_encoder_t; state: uint64;
+                            rgba: uint32) {.cdecl,
     importc: "bgfx_encoder_set_state", dynlib: bgfxdll.}
 ## *
 ##  Set condition for rendering.
@@ -2545,9 +2541,9 @@ proc bgfx_encoder_set_state*(_this: ptr bgfx_encoder_t; _state: uint64;
 ##
 ##
 
-proc bgfx_encoder_set_condition*(_this: ptr bgfx_encoder_t;
-                                _handle: bgfx_occlusion_query_handle_t;
-                                _visible: bool) {.cdecl,
+proc bgfx_encoder_set_condition*(this: ptr bgfx_encoder_t;
+                                handle: bgfx_occlusion_query_handle_t;
+                                visible: bool) {.cdecl,
     importc: "bgfx_encoder_set_condition", dynlib: bgfxdll.}
 ## *
 ##  Set stencil test state.
@@ -2558,213 +2554,213 @@ proc bgfx_encoder_set_condition*(_this: ptr bgfx_encoder_t;
 ##
 ##
 
-proc bgfx_encoder_set_stencil*(_this: ptr bgfx_encoder_t; _fstencil: uint32;
-                              _bstencil: uint32) {.cdecl,
+proc bgfx_encoder_set_stencil*(this: ptr bgfx_encoder_t; fstencil: uint32;
+                              bstencil: uint32) {.cdecl,
     importc: "bgfx_encoder_set_stencil", dynlib: bgfxdll.}
 ## *
 ##  Set scissor for draw primitive.
 ##  @remark
 ##    To scissor for all primitives in view see `bgfx::setViewScissor`.
 ##
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _width Width of view scissor region.
-##  @param[in] _height Height of view scissor region.
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] width Width of view scissor region.
+##  @param[in] height Height of view scissor region.
 ##
 ##  @returns Scissor cache index.
 ##
 ##
 
-proc bgfx_encoder_set_scissor*(_this: ptr bgfx_encoder_t; _x: uint16; _y: uint16;
-                              _width: uint16; _height: uint16): uint16 {.cdecl,
+proc bgfx_encoder_set_scissor*(this: ptr bgfx_encoder_t; x: uint16; y: uint16;
+                              width: uint16; height: uint16): uint16 {.cdecl,
     importc: "bgfx_encoder_set_scissor", dynlib: bgfxdll.}
 ## *
 ##  Set scissor from cache for draw primitive.
 ##  @remark
 ##    To scissor for all primitives in view see `bgfx::setViewScissor`.
 ##
-##  @param[in] _cache Index in scissor cache.
+##  @param[in] cache Index in scissor cache.
 ##
 ##
 
-proc bgfx_encoder_set_scissor_cached*(_this: ptr bgfx_encoder_t; _cache: uint16) {.
+proc bgfx_encoder_set_scissor_cached*(this: ptr bgfx_encoder_t; cache: uint16) {.
     cdecl, importc: "bgfx_encoder_set_scissor_cached", dynlib: bgfxdll.}
 ## *
 ##  Set model matrix for draw primitive. If it is not called,
 ##  the model will be rendered with an identity model matrix.
 ##
-##  @param[in] _mtx Pointer to first matrix in array.
-##  @param[in] _num Number of matrices in array.
+##  @param[in] mtx Pointer to first matrix in array.
+##  @param[in] num Number of matrices in array.
 ##
 ##  @returns Index into matrix cache in case the same model matrix has
 ##   to be used for other draw primitive call.
 ##
 ##
 
-proc bgfx_encoder_set_transform*(_this: ptr bgfx_encoder_t; _mtx: pointer;
-                                _num: uint16): uint32 {.cdecl,
+proc bgfx_encoder_set_transform*(this: ptr bgfx_encoder_t; mtx: pointer;
+                                num: uint16): uint32 {.cdecl,
     importc: "bgfx_encoder_set_transform", dynlib: bgfxdll.}
 ## *
 ##   Set model matrix from matrix cache for draw primitive.
 ##
-##  @param[in] _cache Index in matrix cache.
-##  @param[in] _num Number of matrices from cache.
+##  @param[in] cache Index in matrix cache.
+##  @param[in] num Number of matrices from cache.
 ##
 ##
 
-proc bgfx_encoder_set_transform_cached*(_this: ptr bgfx_encoder_t; _cache: uint32;
-                                       _num: uint16) {.cdecl,
+proc bgfx_encoder_set_transform_cached*(this: ptr bgfx_encoder_t; cache: uint32;
+                                       num: uint16) {.cdecl,
     importc: "bgfx_encoder_set_transform_cached", dynlib: bgfxdll.}
 ## *
 ##  Reserve matrices in internal matrix cache.
 ##  @attention Pointer returned can be modified until `bgfx::frame` is called.
 ##
-##  @param[out] _transform Pointer to `Transform` structure.
-##  @param[in] _num Number of matrices.
+##  @param[out] transform Pointer to `Transform` structure.
+##  @param[in] num Number of matrices.
 ##
 ##  @returns Index in matrix cache.
 ##
 ##
 
-proc bgfx_encoder_alloc_transform*(_this: ptr bgfx_encoder_t;
-                                  _transform: ptr bgfx_transform_t; _num: uint16): uint32 {.
+proc bgfx_encoder_alloc_transform*(this: ptr bgfx_encoder_t;
+                                  transform: ptr bgfx_transform_t; num: uint16): uint32 {.
     cdecl, importc: "bgfx_encoder_alloc_transform", dynlib: bgfxdll.}
 ## *
 ##  Set shader uniform parameter for draw primitive.
 ##
-##  @param[in] _handle Uniform.
-##  @param[in] _value Pointer to uniform data.
-##  @param[in] _num Number of elements. Passing `UINT16_MAX` will
-##   use the _num passed on uniform creation.
+##  @param[in] handle Uniform.
+##  @param[in] value Pointer to uniform data.
+##  @param[in] num Number of elements. Passing `UINT16_MAX` will
+##   use the num passed on uniform creation.
 ##
 ##
 
-proc bgfx_encoder_set_uniform*(_this: ptr bgfx_encoder_t;
-                              _handle: bgfx_uniform_handle_t; _value: pointer;
-                              _num: uint16) {.cdecl,
+proc bgfx_encoder_set_uniform*(this: ptr bgfx_encoder_t;
+                              handle: bgfx_uniform_handle_t; value: pointer;
+                              num: uint16) {.cdecl,
     importc: "bgfx_encoder_set_uniform", dynlib: bgfxdll.}
 ## *
 ##  Set index buffer for draw primitive.
 ##
-##  @param[in] _handle Index buffer.
-##  @param[in] _firstIndex First index to render.
-##  @param[in] _numIndices Number of indices to render.
+##  @param[in] handle Index buffer.
+##  @param[in] firstIndex First index to render.
+##  @param[in] numIndices Number of indices to render.
 ##
 ##
 
-proc bgfx_encoder_set_index_buffer*(_this: ptr bgfx_encoder_t;
-                                   _handle: bgfx_index_buffer_handle_t;
-                                   _firstIndex: uint32; _numIndices: uint32) {.
+proc bgfx_encoder_set_index_buffer*(this: ptr bgfx_encoder_t;
+                                   handle: bgfx_index_buffer_handle_t;
+                                   firstIndex: uint32; numIndices: uint32) {.
     cdecl, importc: "bgfx_encoder_set_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set index buffer for draw primitive.
 ##
-##  @param[in] _handle Dynamic index buffer.
-##  @param[in] _firstIndex First index to render.
-##  @param[in] _numIndices Number of indices to render.
+##  @param[in] handle Dynamic index buffer.
+##  @param[in] firstIndex First index to render.
+##  @param[in] numIndices Number of indices to render.
 ##
 ##
 
-proc bgfx_encoder_set_dynamic_index_buffer*(_this: ptr bgfx_encoder_t;
-    _handle: bgfx_dynamic_index_buffer_handle_t; _firstIndex: uint32;
-    _numIndices: uint32) {.cdecl,
+proc bgfx_encoder_set_dynamic_index_buffer*(this: ptr bgfx_encoder_t;
+    handle: bgfx_dynamic_index_buffer_handle_t; firstIndex: uint32;
+    numIndices: uint32) {.cdecl,
                            importc: "bgfx_encoder_set_dynamic_index_buffer",
                            dynlib: bgfxdll.}
 ## *
 ##  Set index buffer for draw primitive.
 ##
-##  @param[in] _tib Transient index buffer.
-##  @param[in] _firstIndex First index to render.
-##  @param[in] _numIndices Number of indices to render.
+##  @param[in] tib Transient index buffer.
+##  @param[in] firstIndex First index to render.
+##  @param[in] numIndices Number of indices to render.
 ##
 ##
 
-proc bgfx_encoder_set_transient_index_buffer*(_this: ptr bgfx_encoder_t;
-    _tib: ptr bgfx_transient_index_buffer_t; _firstIndex: uint32;
-    _numIndices: uint32) {.cdecl,
+proc bgfx_encoder_set_transient_index_buffer*(this: ptr bgfx_encoder_t;
+    tib: ptr bgfx_transient_index_buffer_t; firstIndex: uint32;
+    numIndices: uint32) {.cdecl,
                            importc: "bgfx_encoder_set_transient_index_buffer",
                            dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
 ##
 ##
 
-proc bgfx_encoder_set_vertex_buffer*(_this: ptr bgfx_encoder_t; _stream: uint8;
-                                    _handle: bgfx_vertex_buffer_handle_t;
-                                    _startVertex: uint32; _numVertices: uint32) {.
+proc bgfx_encoder_set_vertex_buffer*(this: ptr bgfx_encoder_t; stream: uint8;
+                                    handle: bgfx_vertex_buffer_handle_t;
+                                    startVertex: uint32; numVertices: uint32) {.
     cdecl, importc: "bgfx_encoder_set_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
-##  @param[in] _layoutHandle Vertex layout for aliasing vertex buffer. If invalid
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
+##  @param[in] layoutHandle Vertex layout for aliasing vertex buffer. If invalid
 ##   handle is used, vertex layout used for creation
 ##   of vertex buffer will be used.
 ##
 ##
 
-proc bgfx_encoder_set_vertex_buffer_with_layout*(_this: ptr bgfx_encoder_t;
-    _stream: uint8; _handle: bgfx_vertex_buffer_handle_t; _startVertex: uint32;
-    _numVertices: uint32; _layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
+proc bgfx_encoder_set_vertex_buffer_with_layout*(this: ptr bgfx_encoder_t;
+    stream: uint8; handle: bgfx_vertex_buffer_handle_t; startVertex: uint32;
+    numVertices: uint32; layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
     importc: "bgfx_encoder_set_vertex_buffer_with_layout", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Dynamic vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Dynamic vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
 ##
 ##
 
-proc bgfx_encoder_set_dynamic_vertex_buffer*(_this: ptr bgfx_encoder_t;
-    _stream: uint8; _handle: bgfx_dynamic_vertex_buffer_handle_t;
-    _startVertex: uint32; _numVertices: uint32) {.cdecl,
+proc bgfx_encoder_set_dynamic_vertex_buffer*(this: ptr bgfx_encoder_t;
+    stream: uint8; handle: bgfx_dynamic_vertex_buffer_handle_t;
+    startVertex: uint32; numVertices: uint32) {.cdecl,
     importc: "bgfx_encoder_set_dynamic_vertex_buffer", dynlib: bgfxdll.}
 proc bgfx_encoder_set_dynamic_vertex_buffer_with_layout*(
-    _this: ptr bgfx_encoder_t; _stream: uint8;
-    _handle: bgfx_dynamic_vertex_buffer_handle_t; _startVertex: uint32;
-    _numVertices: uint32; _layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
+    this: ptr bgfx_encoder_t; stream: uint8;
+    handle: bgfx_dynamic_vertex_buffer_handle_t; startVertex: uint32;
+    numVertices: uint32; layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
     importc: "bgfx_encoder_set_dynamic_vertex_buffer_with_layout", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _tvb Transient vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
+##  @param[in] stream Vertex stream.
+##  @param[in] tvb Transient vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
 ##
 ##
 
-proc bgfx_encoder_set_transient_vertex_buffer*(_this: ptr bgfx_encoder_t;
-    _stream: uint8; _tvb: ptr bgfx_transient_vertex_buffer_t;
-    _startVertex: uint32; _numVertices: uint32) {.cdecl,
+proc bgfx_encoder_set_transient_vertex_buffer*(this: ptr bgfx_encoder_t;
+    stream: uint8; tvb: ptr bgfx_transient_vertex_buffer_t;
+    startVertex: uint32; numVertices: uint32) {.cdecl,
     importc: "bgfx_encoder_set_transient_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _tvb Transient vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
-##  @param[in] _layoutHandle Vertex layout for aliasing vertex buffer. If invalid
+##  @param[in] stream Vertex stream.
+##  @param[in] tvb Transient vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
+##  @param[in] layoutHandle Vertex layout for aliasing vertex buffer. If invalid
 ##   handle is used, vertex layout used for creation
 ##   of vertex buffer will be used.
 ##
 ##
 
 proc bgfx_encoder_set_transient_vertex_buffer_with_layout*(
-    _this: ptr bgfx_encoder_t; _stream: uint8;
-    _tvb: ptr bgfx_transient_vertex_buffer_t; _startVertex: uint32;
-    _numVertices: uint32; _layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
+    this: ptr bgfx_encoder_t; stream: uint8;
+    tvb: ptr bgfx_transient_vertex_buffer_t; startVertex: uint32;
+    numVertices: uint32; layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
     importc: "bgfx_encoder_set_transient_vertex_buffer_with_layout",
     dynlib: bgfxdll.}
 ## *
@@ -2772,51 +2768,51 @@ proc bgfx_encoder_set_transient_vertex_buffer_with_layout*(
 ##  with gl_VertexID.
 ##  @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 ##
-##  @param[in] _numVertices Number of vertices.
+##  @param[in] numVertices Number of vertices.
 ##
 ##
 
-proc bgfx_encoder_set_vertex_count*(_this: ptr bgfx_encoder_t;
-                                   _numVertices: uint32) {.cdecl,
+proc bgfx_encoder_set_vertex_count*(this: ptr bgfx_encoder_t;
+                                   numVertices: uint32) {.cdecl,
     importc: "bgfx_encoder_set_vertex_count", dynlib: bgfxdll.}
 ## *
 ##  Set instance data buffer for draw primitive.
 ##
-##  @param[in] _idb Transient instance data buffer.
-##  @param[in] _start First instance data.
-##  @param[in] _num Number of data instances.
+##  @param[in] idb Transient instance data buffer.
+##  @param[in] start First instance data.
+##  @param[in] num Number of data instances.
 ##
 ##
 
-proc bgfx_encoder_set_instance_data_buffer*(_this: ptr bgfx_encoder_t;
-    _idb: ptr bgfx_instance_data_buffer_t; _start: uint32; _num: uint32) {.cdecl,
+proc bgfx_encoder_set_instance_data_buffer*(this: ptr bgfx_encoder_t;
+    idb: ptr bgfx_instance_data_buffer_t; start: uint32; num: uint32) {.cdecl,
     importc: "bgfx_encoder_set_instance_data_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set instance data buffer for draw primitive.
 ##
-##  @param[in] _handle Vertex buffer.
-##  @param[in] _startVertex First instance data.
-##  @param[in] _num Number of data instances.
+##  @param[in] handle Vertex buffer.
+##  @param[in] startVertex First instance data.
+##  @param[in] num Number of data instances.
 ##   Set instance data buffer for draw primitive.
 ##
 ##
 
 proc bgfx_encoder_set_instance_data_from_vertex_buffer*(
-    _this: ptr bgfx_encoder_t; _handle: bgfx_vertex_buffer_handle_t;
-    _startVertex: uint32; _num: uint32) {.cdecl,
+    this: ptr bgfx_encoder_t; handle: bgfx_vertex_buffer_handle_t;
+    startVertex: uint32; num: uint32) {.cdecl,
     importc: "bgfx_encoder_set_instance_data_from_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set instance data buffer for draw primitive.
 ##
-##  @param[in] _handle Dynamic vertex buffer.
-##  @param[in] _startVertex First instance data.
-##  @param[in] _num Number of data instances.
+##  @param[in] handle Dynamic vertex buffer.
+##  @param[in] startVertex First instance data.
+##  @param[in] num Number of data instances.
 ##
 ##
 
 proc bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer*(
-    _this: ptr bgfx_encoder_t; _handle: bgfx_dynamic_vertex_buffer_handle_t;
-    _startVertex: uint32; _num: uint32) {.cdecl,
+    this: ptr bgfx_encoder_t; handle: bgfx_dynamic_vertex_buffer_handle_t;
+    startVertex: uint32; num: uint32) {.cdecl,
     importc: "bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer",
     dynlib: bgfxdll.}
 ## *
@@ -2824,20 +2820,20 @@ proc bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer*(
 ##  with gl_InstanceID.
 ##  @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 ##
-##  @param[in] _numInstances
+##  @param[in] numInstances
 ##
 ##
 
-proc bgfx_encoder_set_instance_count*(_this: ptr bgfx_encoder_t;
-                                     _numInstances: uint32) {.cdecl,
+proc bgfx_encoder_set_instance_count*(this: ptr bgfx_encoder_t;
+                                     numInstances: uint32) {.cdecl,
     importc: "bgfx_encoder_set_instance_count", dynlib: bgfxdll.}
 ## *
 ##  Set texture stage for draw primitive.
 ##
-##  @param[in] _stage Texture unit.
-##  @param[in] _sampler Program sampler.
-##  @param[in] _handle Texture handle.
-##  @param[in] _flags Texture sampling mode. Default value UINT32_MAX uses
+##  @param[in] stage Texture unit.
+##  @param[in] sampler Program sampler.
+##  @param[in] handle Texture handle.
+##  @param[in] flags Texture sampling mode. Default value UINT32_MAX uses
 ##     texture sampling settings from the texture.
 ##     - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##       mode.
@@ -2846,9 +2842,9 @@ proc bgfx_encoder_set_instance_count*(_this: ptr bgfx_encoder_t;
 ##
 ##
 
-proc bgfx_encoder_set_texture*(_this: ptr bgfx_encoder_t; _stage: uint8;
-                              _sampler: bgfx_uniform_handle_t;
-                              _handle: bgfx_texture_handle_t; _flags: uint32) {.
+proc bgfx_encoder_set_texture*(this: ptr bgfx_encoder_t; stage: uint8;
+                              sampler: bgfx_uniform_handle_t;
+                              handle: bgfx_texture_handle_t; flags: uint32) {.
     cdecl, importc: "bgfx_encoder_set_texture", dynlib: bgfxdll.}
 ## *
 ##  Submit an empty primitive for rendering. Uniforms and draw state
@@ -2858,213 +2854,213 @@ proc bgfx_encoder_set_texture*(_this: ptr bgfx_encoder_t; _stage: uint8;
 ##  @remark
 ##    These empty draw calls will sort before ordinary draw calls.
 ##
-##  @param[in] _id View id.
+##  @param[in] id View id.
 ##
 ##
 
-proc bgfx_encoder_touch*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t) {.cdecl,
+proc bgfx_encoder_touch*(this: ptr bgfx_encoder_t; id: bgfx_view_id_t) {.cdecl,
     importc: "bgfx_encoder_touch", dynlib: bgfxdll.}
 ## *
 ##  Submit primitive for rendering.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Program.
-##  @param[in] _depth Depth for sorting.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Program.
+##  @param[in] depth Depth for sorting.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_encoder_submit*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t;
-                         _program: bgfx_program_handle_t; _depth: uint32;
-                         _flags: uint8) {.cdecl, importc: "bgfx_encoder_submit",
+proc bgfx_encoder_submit*(this: ptr bgfx_encoder_t; id: bgfx_view_id_t;
+                         program: bgfx_program_handle_t; depth: uint32;
+                         flags: uint8) {.cdecl, importc: "bgfx_encoder_submit",
     dynlib: bgfxdll.}
 ## *
 ##  Submit primitive with occlusion query for rendering.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Program.
-##  @param[in] _occlusionQuery Occlusion query.
-##  @param[in] _depth Depth for sorting.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Program.
+##  @param[in] occlusionQuery Occlusion query.
+##  @param[in] depth Depth for sorting.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_encoder_submit_occlusion_query*(_this: ptr bgfx_encoder_t;
-    _id: bgfx_view_id_t; _program: bgfx_program_handle_t;
-    _occlusionQuery: bgfx_occlusion_query_handle_t; _depth: uint32;
-    _flags: uint8) {.cdecl, importc: "bgfx_encoder_submit_occlusion_query",
+proc bgfx_encoder_submit_occlusion_query*(this: ptr bgfx_encoder_t;
+    id: bgfx_view_id_t; program: bgfx_program_handle_t;
+    occlusionQuery: bgfx_occlusion_query_handle_t; depth: uint32;
+    flags: uint8) {.cdecl, importc: "bgfx_encoder_submit_occlusion_query",
                      dynlib: bgfxdll.}
 ## *
 ##  Submit primitive for rendering with index and instance data info from
 ##  indirect buffer.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Program.
-##  @param[in] _indirectHandle Indirect buffer.
-##  @param[in] _start First element in indirect buffer.
-##  @param[in] _num Number of dispatches.
-##  @param[in] _depth Depth for sorting.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Program.
+##  @param[in] indirectHandle Indirect buffer.
+##  @param[in] start First element in indirect buffer.
+##  @param[in] num Number of dispatches.
+##  @param[in] depth Depth for sorting.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_encoder_submit_indirect*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t;
-                                  _program: bgfx_program_handle_t; _indirectHandle: bgfx_indirect_buffer_handle_t;
-                                  _start: uint16; _num: uint16;
-                                  _depth: uint32; _flags: uint8) {.cdecl,
+proc bgfx_encoder_submit_indirect*(this: ptr bgfx_encoder_t; id: bgfx_view_id_t;
+                                  program: bgfx_program_handle_t; indirectHandle: bgfx_indirect_buffer_handle_t;
+                                  start: uint16; num: uint16;
+                                  depth: uint32; flags: uint8) {.cdecl,
     importc: "bgfx_encoder_submit_indirect", dynlib: bgfxdll.}
 ## *
 ##  Set compute index buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Index buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Index buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_encoder_set_compute_index_buffer*(_this: ptr bgfx_encoder_t;
-    _stage: uint8; _handle: bgfx_index_buffer_handle_t; _access: bgfx_access_t) {.
+proc bgfx_encoder_set_compute_index_buffer*(this: ptr bgfx_encoder_t;
+    stage: uint8; handle: bgfx_index_buffer_handle_t; access: bgfx_access_t) {.
     cdecl, importc: "bgfx_encoder_set_compute_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute vertex buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Vertex buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Vertex buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_encoder_set_compute_vertex_buffer*(_this: ptr bgfx_encoder_t;
-    _stage: uint8; _handle: bgfx_vertex_buffer_handle_t; _access: bgfx_access_t) {.
+proc bgfx_encoder_set_compute_vertex_buffer*(this: ptr bgfx_encoder_t;
+    stage: uint8; handle: bgfx_vertex_buffer_handle_t; access: bgfx_access_t) {.
     cdecl, importc: "bgfx_encoder_set_compute_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute dynamic index buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Dynamic index buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Dynamic index buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_encoder_set_compute_dynamic_index_buffer*(_this: ptr bgfx_encoder_t;
-    _stage: uint8; _handle: bgfx_dynamic_index_buffer_handle_t;
-    _access: bgfx_access_t) {.cdecl, importc: "bgfx_encoder_set_compute_dynamic_index_buffer",
+proc bgfx_encoder_set_compute_dynamic_index_buffer*(this: ptr bgfx_encoder_t;
+    stage: uint8; handle: bgfx_dynamic_index_buffer_handle_t;
+    access: bgfx_access_t) {.cdecl, importc: "bgfx_encoder_set_compute_dynamic_index_buffer",
                             dynlib: bgfxdll.}
 ## *
 ##  Set compute dynamic vertex buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Dynamic vertex buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Dynamic vertex buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_encoder_set_compute_dynamic_vertex_buffer*(_this: ptr bgfx_encoder_t;
-    _stage: uint8; _handle: bgfx_dynamic_vertex_buffer_handle_t;
-    _access: bgfx_access_t) {.cdecl, importc: "bgfx_encoder_set_compute_dynamic_vertex_buffer",
+proc bgfx_encoder_set_compute_dynamic_vertex_buffer*(this: ptr bgfx_encoder_t;
+    stage: uint8; handle: bgfx_dynamic_vertex_buffer_handle_t;
+    access: bgfx_access_t) {.cdecl, importc: "bgfx_encoder_set_compute_dynamic_vertex_buffer",
                             dynlib: bgfxdll.}
 ## *
 ##  Set compute indirect buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Indirect buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Indirect buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_encoder_set_compute_indirect_buffer*(_this: ptr bgfx_encoder_t;
-    _stage: uint8; _handle: bgfx_indirect_buffer_handle_t; _access: bgfx_access_t) {.
+proc bgfx_encoder_set_compute_indirect_buffer*(this: ptr bgfx_encoder_t;
+    stage: uint8; handle: bgfx_indirect_buffer_handle_t; access: bgfx_access_t) {.
     cdecl, importc: "bgfx_encoder_set_compute_indirect_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute image from texture.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Texture handle.
-##  @param[in] _mip Mip level.
-##  @param[in] _access Image access. See `Access::Enum`.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Texture handle.
+##  @param[in] mip Mip level.
+##  @param[in] access Image access. See `Access::Enum`.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
 ##
 ##
 
-proc bgfx_encoder_set_image*(_this: ptr bgfx_encoder_t; _stage: uint8;
-                            _handle: bgfx_texture_handle_t; _mip: uint8;
-                            _access: bgfx_access_t; _format: bgfx_texture_format_t) {.
+proc bgfx_encoder_set_image*(this: ptr bgfx_encoder_t; stage: uint8;
+                            handle: bgfx_texture_handle_t; mip: uint8;
+                            access: bgfx_access_t; format: bgfx_texture_format_t) {.
     cdecl, importc: "bgfx_encoder_set_image", dynlib: bgfxdll.}
 ## *
 ##  Dispatch compute.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Compute program.
-##  @param[in] _numX Number of groups X.
-##  @param[in] _numY Number of groups Y.
-##  @param[in] _numZ Number of groups Z.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Compute program.
+##  @param[in] numX Number of groups X.
+##  @param[in] numY Number of groups Y.
+##  @param[in] numZ Number of groups Z.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_encoder_dispatch*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t;
-                           _program: bgfx_program_handle_t; _numX: uint32;
-                           _numY: uint32; _numZ: uint32; _flags: uint8) {.cdecl,
+proc bgfx_encoder_dispatch*(this: ptr bgfx_encoder_t; id: bgfx_view_id_t;
+                           program: bgfx_program_handle_t; numX: uint32;
+                           numY: uint32; numZ: uint32; flags: uint8) {.cdecl,
     importc: "bgfx_encoder_dispatch", dynlib: bgfxdll.}
 ## *
 ##  Dispatch compute indirect.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Compute program.
-##  @param[in] _indirectHandle Indirect buffer.
-##  @param[in] _start First element in indirect buffer.
-##  @param[in] _num Number of dispatches.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Compute program.
+##  @param[in] indirectHandle Indirect buffer.
+##  @param[in] start First element in indirect buffer.
+##  @param[in] num Number of dispatches.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_encoder_dispatch_indirect*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t;
-                                    _program: bgfx_program_handle_t;
-    _indirectHandle: bgfx_indirect_buffer_handle_t; _start: uint16;
-                                    _num: uint16; _flags: uint8) {.cdecl,
+proc bgfx_encoder_dispatch_indirect*(this: ptr bgfx_encoder_t; id: bgfx_view_id_t;
+                                    program: bgfx_program_handle_t;
+    indirectHandle: bgfx_indirect_buffer_handle_t; start: uint16;
+                                    num: uint16; flags: uint8) {.cdecl,
     importc: "bgfx_encoder_dispatch_indirect", dynlib: bgfxdll.}
 ## *
 ##  Discard previously set state for draw or compute call.
 ##
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_encoder_discard*(_this: ptr bgfx_encoder_t; _flags: uint8) {.cdecl,
+proc bgfx_encoder_discard*(this: ptr bgfx_encoder_t; flags: uint8) {.cdecl,
     importc: "bgfx_encoder_discard", dynlib: bgfxdll.}
 ## *
 ##  Blit 2D texture region between two 2D textures.
 ##  @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 ##  @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 ##
-##  @param[in] _id View id.
-##  @param[in] _dst Destination texture handle.
-##  @param[in] _dstMip Destination texture mip level.
-##  @param[in] _dstX Destination texture X position.
-##  @param[in] _dstY Destination texture Y position.
-##  @param[in] _dstZ If texture is 2D this argument should be 0. If destination texture is cube
+##  @param[in] id View id.
+##  @param[in] dst Destination texture handle.
+##  @param[in] dstMip Destination texture mip level.
+##  @param[in] dstX Destination texture X position.
+##  @param[in] dstY Destination texture Y position.
+##  @param[in] dstZ If texture is 2D this argument should be 0. If destination texture is cube
 ##   this argument represents destination texture cube face. For 3D texture this argument
 ##   represents destination texture Z position.
-##  @param[in] _src Source texture handle.
-##  @param[in] _srcMip Source texture mip level.
-##  @param[in] _srcX Source texture X position.
-##  @param[in] _srcY Source texture Y position.
-##  @param[in] _srcZ If texture is 2D this argument should be 0. If source texture is cube
+##  @param[in] src Source texture handle.
+##  @param[in] srcMip Source texture mip level.
+##  @param[in] srcX Source texture X position.
+##  @param[in] srcY Source texture Y position.
+##  @param[in] srcZ If texture is 2D this argument should be 0. If source texture is cube
 ##   this argument represents source texture cube face. For 3D texture this argument
 ##   represents source texture Z position.
-##  @param[in] _width Width of region.
-##  @param[in] _height Height of region.
-##  @param[in] _depth If texture is 3D this argument represents depth of region, otherwise it's
+##  @param[in] width Width of region.
+##  @param[in] height Height of region.
+##  @param[in] depth If texture is 3D this argument represents depth of region, otherwise it's
 ##   unused.
 ##
 ##
 
-proc bgfx_encoder_blit*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t;
-                       _dst: bgfx_texture_handle_t; _dstMip: uint8;
-                       _dstX: uint16; _dstY: uint16; _dstZ: uint16;
-                       _src: bgfx_texture_handle_t; _srcMip: uint8;
-                       _srcX: uint16; _srcY: uint16; _srcZ: uint16;
-                       _width: uint16; _height: uint16; _depth: uint16) {.cdecl,
+proc bgfx_encoder_blit*(this: ptr bgfx_encoder_t; id: bgfx_view_id_t;
+                       dst: bgfx_texture_handle_t; dstMip: uint8;
+                       dstX: uint16; dstY: uint16; dstZ: uint16;
+                       src: bgfx_texture_handle_t; srcMip: uint8;
+                       srcX: uint16; srcY: uint16; srcZ: uint16;
+                       width: uint16; height: uint16; depth: uint16) {.cdecl,
     importc: "bgfx_encoder_blit", dynlib: bgfxdll.}
 ## *
 ##  Request screen shot of window back buffer.
@@ -3072,14 +3068,14 @@ proc bgfx_encoder_blit*(_this: ptr bgfx_encoder_t; _id: bgfx_view_id_t;
 ##    `bgfx::CallbackI::screenShot` must be implemented.
 ##  @attention Frame buffer handle must be created with OS' target native window handle.
 ##
-##  @param[in] _handle Frame buffer handle. If handle is `BGFX_INVALID_HANDLE` request will be
+##  @param[in] handle Frame buffer handle. If handle is `BGFX_INVALID_HANDLE` request will be
 ##   made for main window back buffer.
-##  @param[in] _filePath Will be passed to `bgfx::CallbackI::screenShot` callback.
+##  @param[in] filePath Will be passed to `bgfx::CallbackI::screenShot` callback.
 ##
 ##
 
-proc bgfx_request_screen_shot*(_handle: bgfx_frame_buffer_handle_t;
-                              _filePath: cstring) {.cdecl,
+proc bgfx_request_screen_shot*(handle: bgfx_frame_buffer_handle_t;
+                              filePath: cstring) {.cdecl,
     importc: "bgfx_request_screen_shot", dynlib: bgfxdll.}
 ## *
 ##  Render frame.
@@ -3097,17 +3093,17 @@ proc bgfx_request_screen_shot*(_handle: bgfx_frame_buffer_handle_t;
 ##
 ##
 
-proc bgfx_render_frame*(_msecs: int32_t): bgfx_render_frame_t {.cdecl,
+proc bgfx_render_frame*(msecs: int32): bgfx_render_frame_t {.cdecl,
     importc: "bgfx_render_frame", dynlib: bgfxdll.}
 ## *
 ##  Set platform data.
 ##  @warning Must be called before `bgfx::init`.
 ##
-##  @param[in] _data Platform data.
+##  @param[in] data Platform data.
 ##
 ##
 
-proc bgfx_set_platform_data*(_data: ptr bgfx_platform_data_t) {.cdecl,
+proc bgfx_set_platform_data*(data: ptr bgfx_platform_data_t) {.cdecl,
     importc: "bgfx_set_platform_data", dynlib: bgfxdll.}
 ## *
 ##  Get internal data for interop.
@@ -3134,8 +3130,8 @@ proc bgfx_get_internal_data*(): ptr bgfx_internal_data_t {.cdecl,
 ##
 ##
 
-proc bgfx_override_internal_texture_ptr*(_handle: bgfx_texture_handle_t;
-                                        _ptr: uintptr_t): uintptr_t {.cdecl,
+proc bgfx_override_internal_texture_ptr*(handle: bgfx_texture_handle_t;
+                                        p: ptr uint): ptr uint {.cdecl,
     importc: "bgfx_override_internal_texture_ptr", dynlib: bgfxdll.}
 ## *
 ##  Override internal texture by creating new texture. Previously created
@@ -3146,12 +3142,12 @@ proc bgfx_override_internal_texture_ptr*(_handle: bgfx_texture_handle_t;
 ##    main thread.
 ##  @warning Must be called only on render thread.
 ##
-##  @param[in] _handle Texture handle.
-##  @param[in] _width Width.
-##  @param[in] _height Height.
-##  @param[in] _numMips Number of mip-maps.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
-##  @param[in] _flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
+##  @param[in] handle Texture handle.
+##  @param[in] width Width.
+##  @param[in] height Height.
+##  @param[in] numMips Number of mip-maps.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] flags Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`)
 ##   flags. Default texture sampling mode is linear, and wrap mode is repeat.
 ##   - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##     mode.
@@ -3163,11 +3159,11 @@ proc bgfx_override_internal_texture_ptr*(_handle: bgfx_texture_handle_t;
 ##
 ##
 
-proc bgfx_override_internal_texture*(_handle: bgfx_texture_handle_t;
-                                    _width: uint16; _height: uint16;
-                                    _numMips: uint8;
-                                    _format: bgfx_texture_format_t;
-                                    _flags: uint64): uintptr_t {.cdecl,
+proc bgfx_override_internal_texture*(handle: bgfx_texture_handle_t;
+                                    width: uint16; height: uint16;
+                                    numMips: uint8;
+                                    format: bgfx_texture_format_t;
+                                    flags: uint64): ptr uint {.cdecl,
     importc: "bgfx_override_internal_texture", dynlib: bgfxdll.}
 ## *
 ##  Sets a debug marker. This allows you to group graphics calls together for easy browsing in
@@ -3177,18 +3173,18 @@ proc bgfx_override_internal_texture*(_handle: bgfx_texture_handle_t;
 ##
 ##
 
-proc bgfx_set_marker*(_marker: cstring) {.cdecl, importc: "bgfx_set_marker",
+proc bgfx_set_marker*(marker: cstring) {.cdecl, importc: "bgfx_set_marker",
                                        dynlib: bgfxdll.}
 ## *
 ##  Set render states for draw primitive.
 ##  @remarks
 ##    1. To set up more complex states use:
-##       `BGFX_STATE_ALPHA_REF(_ref)`,
-##       `BGFX_STATE_POINT_SIZE(_size)`,
-##       `BGFX_STATE_BLEND_FUNC(_src, _dst)`,
-##       `BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA)`,
-##       `BGFX_STATE_BLEND_EQUATION(_equation)`,
-##       `BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)`
+##       `BGFX_STATE_ALPHA_REF(ref)`,
+##       `BGFX_STATE_POINT_SIZE(size)`,
+##       `BGFX_STATE_BLEND_FUNC(src, dst)`,
+##       `BGFX_STATE_BLEND_FUNC_SEPARATE(srcRGB, dstRGB, srcA, dstA)`,
+##       `BGFX_STATE_BLEND_EQUATION(equation)`,
+##       `BGFX_STATE_BLEND_EQUATION_SEPARATE(equationRGB, equationA)`
 ##    2. `BGFX_STATE_BLEND_EQUATION_ADD` is set when no other blend
 ##       equation is specified.
 ##
@@ -3206,7 +3202,7 @@ proc bgfx_set_marker*(_marker: cstring) {.cdecl, importc: "bgfx_set_marker",
 ##
 ##
 
-proc bgfx_set_state*(_state: uint64; _rgba: uint32) {.cdecl,
+proc bgfx_set_state*(state: uint64; rgba: uint32) {.cdecl,
     importc: "bgfx_set_state", dynlib: bgfxdll.}
 ## *
 ##  Set condition for rendering.
@@ -3216,7 +3212,7 @@ proc bgfx_set_state*(_state: uint64; _rgba: uint32) {.cdecl,
 ##
 ##
 
-proc bgfx_set_condition*(_handle: bgfx_occlusion_query_handle_t; _visible: bool) {.
+proc bgfx_set_condition*(handle: bgfx_occlusion_query_handle_t; visible: bool) {.
     cdecl, importc: "bgfx_set_condition", dynlib: bgfxdll.}
 ## *
 ##  Set stencil test state.
@@ -3227,23 +3223,23 @@ proc bgfx_set_condition*(_handle: bgfx_occlusion_query_handle_t; _visible: bool)
 ##
 ##
 
-proc bgfx_set_stencil*(_fstencil: uint32; _bstencil: uint32) {.cdecl,
+proc bgfx_set_stencil*(fstencil: uint32; bstencil: uint32) {.cdecl,
     importc: "bgfx_set_stencil", dynlib: bgfxdll.}
 ## *
 ##  Set scissor for draw primitive.
 ##  @remark
 ##    To scissor for all primitives in view see `bgfx::setViewScissor`.
 ##
-##  @param[in] _x Position x from the left corner of the window.
-##  @param[in] _y Position y from the top corner of the window.
-##  @param[in] _width Width of view scissor region.
-##  @param[in] _height Height of view scissor region.
+##  @param[in] x Position x from the left corner of the window.
+##  @param[in] y Position y from the top corner of the window.
+##  @param[in] width Width of view scissor region.
+##  @param[in] height Height of view scissor region.
 ##
 ##  @returns Scissor cache index.
 ##
 ##
 
-proc bgfx_set_scissor*(_x: uint16; _y: uint16; _width: uint16; _height: uint16): uint16 {.
+proc bgfx_set_scissor*(x: uint16; y: uint16; width: uint16; height: uint16): uint16 {.
     cdecl, importc: "bgfx_set_scissor", dynlib: bgfxdll.}
 ## *
 ##  Set scissor from cache for draw primitive.
@@ -3254,236 +3250,236 @@ proc bgfx_set_scissor*(_x: uint16; _y: uint16; _width: uint16; _height: uint16):
 ##
 ##
 
-proc bgfx_set_scissor_cached*(_cache: uint16) {.cdecl,
+proc bgfx_set_scissor_cached*(cache: uint16) {.cdecl,
     importc: "bgfx_set_scissor_cached", dynlib: bgfxdll.}
 ## *
 ##  Set model matrix for draw primitive. If it is not called,
 ##  the model will be rendered with an identity model matrix.
 ##
-##  @param[in] _mtx Pointer to first matrix in array.
-##  @param[in] _num Number of matrices in array.
+##  @param[in] mtx Pointer to first matrix in array.
+##  @param[in] num Number of matrices in array.
 ##
 ##  @returns Index into matrix cache in case the same model matrix has
 ##   to be used for other draw primitive call.
 ##
 ##
 
-proc bgfx_set_transform*(_mtx: pointer; _num: uint16): uint32 {.cdecl,
+proc bgfx_set_transform*(mtx: pointer; num: uint16): uint32 {.cdecl,
     importc: "bgfx_set_transform", dynlib: bgfxdll.}
 ## *
 ##   Set model matrix from matrix cache for draw primitive.
 ##
-##  @param[in] _cache Index in matrix cache.
-##  @param[in] _num Number of matrices from cache.
+##  @param[in] cache Index in matrix cache.
+##  @param[in] num Number of matrices from cache.
 ##
 ##
 
-proc bgfx_set_transform_cached*(_cache: uint32; _num: uint16) {.cdecl,
+proc bgfx_set_transform_cached*(cache: uint32; num: uint16) {.cdecl,
     importc: "bgfx_set_transform_cached", dynlib: bgfxdll.}
 ## *
 ##  Reserve matrices in internal matrix cache.
 ##  @attention Pointer returned can be modified until `bgfx::frame` is called.
 ##
-##  @param[out] _transform Pointer to `Transform` structure.
-##  @param[in] _num Number of matrices.
+##  @param[out] transform Pointer to `Transform` structure.
+##  @param[in] num Number of matrices.
 ##
 ##  @returns Index in matrix cache.
 ##
 ##
 
-proc bgfx_alloc_transform*(_transform: ptr bgfx_transform_t; _num: uint16): uint32 {.
+proc bgfx_alloc_transform*(transform: ptr bgfx_transform_t; num: uint16): uint32 {.
     cdecl, importc: "bgfx_alloc_transform", dynlib: bgfxdll.}
 ## *
 ##  Set shader uniform parameter for draw primitive.
 ##
-##  @param[in] _handle Uniform.
-##  @param[in] _value Pointer to uniform data.
-##  @param[in] _num Number of elements. Passing `UINT16_MAX` will
-##   use the _num passed on uniform creation.
+##  @param[in] handle Uniform.
+##  @param[in] value Pointer to uniform data.
+##  @param[in] num Number of elements. Passing `UINT16_MAX` will
+##   use the num passed on uniform creation.
 ##
 ##
 
-proc bgfx_set_uniform*(_handle: bgfx_uniform_handle_t; _value: pointer;
-                      _num: uint16) {.cdecl, importc: "bgfx_set_uniform",
+proc bgfx_set_uniform*(handle: bgfx_uniform_handle_t; value: pointer;
+                      num: uint16) {.cdecl, importc: "bgfx_set_uniform",
                                       dynlib: bgfxdll.}
 ## *
 ##  Set index buffer for draw primitive.
 ##
-##  @param[in] _handle Index buffer.
-##  @param[in] _firstIndex First index to render.
-##  @param[in] _numIndices Number of indices to render.
+##  @param[in] handle Index buffer.
+##  @param[in] firstIndex First index to render.
+##  @param[in] numIndices Number of indices to render.
 ##
 ##
 
-proc bgfx_set_index_buffer*(_handle: bgfx_index_buffer_handle_t;
-                           _firstIndex: uint32; _numIndices: uint32) {.cdecl,
+proc bgfx_set_index_buffer*(handle: bgfx_index_buffer_handle_t;
+                           firstIndex: uint32; numIndices: uint32) {.cdecl,
     importc: "bgfx_set_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set index buffer for draw primitive.
 ##
-##  @param[in] _handle Dynamic index buffer.
-##  @param[in] _firstIndex First index to render.
-##  @param[in] _numIndices Number of indices to render.
+##  @param[in] handle Dynamic index buffer.
+##  @param[in] firstIndex First index to render.
+##  @param[in] numIndices Number of indices to render.
 ##
 ##
 
-proc bgfx_set_dynamic_index_buffer*(_handle: bgfx_dynamic_index_buffer_handle_t;
-                                   _firstIndex: uint32; _numIndices: uint32) {.
+proc bgfx_set_dynamic_index_buffer*(handle: bgfx_dynamic_index_buffer_handle_t;
+                                   firstIndex: uint32; numIndices: uint32) {.
     cdecl, importc: "bgfx_set_dynamic_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set index buffer for draw primitive.
 ##
-##  @param[in] _tib Transient index buffer.
-##  @param[in] _firstIndex First index to render.
-##  @param[in] _numIndices Number of indices to render.
+##  @param[in] tib Transient index buffer.
+##  @param[in] firstIndex First index to render.
+##  @param[in] numIndices Number of indices to render.
 ##
 ##
 
-proc bgfx_set_transient_index_buffer*(_tib: ptr bgfx_transient_index_buffer_t;
-                                     _firstIndex: uint32; _numIndices: uint32) {.
+proc bgfx_set_transient_index_buffer*(tib: ptr bgfx_transient_index_buffer_t;
+                                     firstIndex: uint32; numIndices: uint32) {.
     cdecl, importc: "bgfx_set_transient_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
 ##
 ##
 
-proc bgfx_set_vertex_buffer*(_stream: uint8;
-                            _handle: bgfx_vertex_buffer_handle_t;
-                            _startVertex: uint32; _numVertices: uint32) {.cdecl,
+proc bgfx_set_vertex_buffer*(stream: uint8;
+                            handle: bgfx_vertex_buffer_handle_t;
+                            startVertex: uint32; numVertices: uint32) {.cdecl,
     importc: "bgfx_set_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
-##  @param[in] _layoutHandle Vertex layout for aliasing vertex buffer. If invalid
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
+##  @param[in] layoutHandle Vertex layout for aliasing vertex buffer. If invalid
 ##   handle is used, vertex layout used for creation
 ##   of vertex buffer will be used.
 ##
 ##
 
-proc bgfx_set_vertex_buffer_with_layout*(_stream: uint8;
-                                        _handle: bgfx_vertex_buffer_handle_t;
-                                        _startVertex: uint32;
-                                        _numVertices: uint32; _layoutHandle: bgfx_vertex_layout_handle_t) {.
+proc bgfx_set_vertex_buffer_with_layout*(stream: uint8;
+                                        handle: bgfx_vertex_buffer_handle_t;
+                                        startVertex: uint32;
+                                        numVertices: uint32; layoutHandle: bgfx_vertex_layout_handle_t) {.
     cdecl, importc: "bgfx_set_vertex_buffer_with_layout", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Dynamic vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Dynamic vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
 ##
 ##
 
-proc bgfx_set_dynamic_vertex_buffer*(_stream: uint8; _handle: bgfx_dynamic_vertex_buffer_handle_t;
-                                    _startVertex: uint32; _numVertices: uint32) {.
+proc bgfx_set_dynamic_vertex_buffer*(stream: uint8; handle: bgfx_dynamic_vertex_buffer_handle_t;
+                                    startVertex: uint32; numVertices: uint32) {.
     cdecl, importc: "bgfx_set_dynamic_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _handle Dynamic vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
-##  @param[in] _layoutHandle Vertex layout for aliasing vertex buffer. If invalid
+##  @param[in] stream Vertex stream.
+##  @param[in] handle Dynamic vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
+##  @param[in] layoutHandle Vertex layout for aliasing vertex buffer. If invalid
 ##   handle is used, vertex layout used for creation
 ##   of vertex buffer will be used.
 ##
 ##
 
-proc bgfx_set_dynamic_vertex_buffer_with_layout*(_stream: uint8;
-    _handle: bgfx_dynamic_vertex_buffer_handle_t; _startVertex: uint32;
-    _numVertices: uint32; _layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
+proc bgfx_set_dynamic_vertex_buffer_with_layout*(stream: uint8;
+    handle: bgfx_dynamic_vertex_buffer_handle_t; startVertex: uint32;
+    numVertices: uint32; layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
     importc: "bgfx_set_dynamic_vertex_buffer_with_layout", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _tvb Transient vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
+##  @param[in] stream Vertex stream.
+##  @param[in] tvb Transient vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
 ##
 ##
 
-proc bgfx_set_transient_vertex_buffer*(_stream: uint8;
-                                      _tvb: ptr bgfx_transient_vertex_buffer_t;
-                                      _startVertex: uint32;
-                                      _numVertices: uint32) {.cdecl,
+proc bgfx_set_transient_vertex_buffer*(stream: uint8;
+                                      tvb: ptr bgfx_transient_vertex_buffer_t;
+                                      startVertex: uint32;
+                                      numVertices: uint32) {.cdecl,
     importc: "bgfx_set_transient_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set vertex buffer for draw primitive.
 ##
-##  @param[in] _stream Vertex stream.
-##  @param[in] _tvb Transient vertex buffer.
-##  @param[in] _startVertex First vertex to render.
-##  @param[in] _numVertices Number of vertices to render.
-##  @param[in] _layoutHandle Vertex layout for aliasing vertex buffer. If invalid
+##  @param[in] stream Vertex stream.
+##  @param[in] tvb Transient vertex buffer.
+##  @param[in] startVertex First vertex to render.
+##  @param[in] numVertices Number of vertices to render.
+##  @param[in] layoutHandle Vertex layout for aliasing vertex buffer. If invalid
 ##   handle is used, vertex layout used for creation
 ##   of vertex buffer will be used.
 ##
 ##
 
-proc bgfx_set_transient_vertex_buffer_with_layout*(_stream: uint8;
-    _tvb: ptr bgfx_transient_vertex_buffer_t; _startVertex: uint32;
-    _numVertices: uint32; _layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
+proc bgfx_set_transient_vertex_buffer_with_layout*(stream: uint8;
+    tvb: ptr bgfx_transient_vertex_buffer_t; startVertex: uint32;
+    numVertices: uint32; layoutHandle: bgfx_vertex_layout_handle_t) {.cdecl,
     importc: "bgfx_set_transient_vertex_buffer_with_layout", dynlib: bgfxdll.}
 ## *
 ##  Set number of vertices for auto generated vertices use in conjunction
 ##  with gl_VertexID.
 ##  @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 ##
-##  @param[in] _numVertices Number of vertices.
+##  @param[in] numVertices Number of vertices.
 ##
 ##
 
-proc bgfx_set_vertex_count*(_numVertices: uint32) {.cdecl,
+proc bgfx_set_vertex_count*(numVertices: uint32) {.cdecl,
     importc: "bgfx_set_vertex_count", dynlib: bgfxdll.}
 ## *
 ##  Set instance data buffer for draw primitive.
 ##
-##  @param[in] _idb Transient instance data buffer.
-##  @param[in] _start First instance data.
-##  @param[in] _num Number of data instances.
+##  @param[in] idb Transient instance data buffer.
+##  @param[in] start First instance data.
+##  @param[in] num Number of data instances.
 ##
 ##
 
-proc bgfx_set_instance_data_buffer*(_idb: ptr bgfx_instance_data_buffer_t;
-                                   _start: uint32; _num: uint32) {.cdecl,
+proc bgfx_set_instance_data_buffer*(idb: ptr bgfx_instance_data_buffer_t;
+                                   start: uint32; num: uint32) {.cdecl,
     importc: "bgfx_set_instance_data_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set instance data buffer for draw primitive.
 ##
-##  @param[in] _handle Vertex buffer.
-##  @param[in] _startVertex First instance data.
-##  @param[in] _num Number of data instances.
+##  @param[in] handle Vertex buffer.
+##  @param[in] startVertex First instance data.
+##  @param[in] num Number of data instances.
 ##   Set instance data buffer for draw primitive.
 ##
 ##
 
 proc bgfx_set_instance_data_from_vertex_buffer*(
-    _handle: bgfx_vertex_buffer_handle_t; _startVertex: uint32; _num: uint32) {.
+    handle: bgfx_vertex_buffer_handle_t; startVertex: uint32; num: uint32) {.
     cdecl, importc: "bgfx_set_instance_data_from_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set instance data buffer for draw primitive.
 ##
-##  @param[in] _handle Dynamic vertex buffer.
-##  @param[in] _startVertex First instance data.
-##  @param[in] _num Number of data instances.
+##  @param[in] handle Dynamic vertex buffer.
+##  @param[in] startVertex First instance data.
+##  @param[in] num Number of data instances.
 ##
 ##
 
 proc bgfx_set_instance_data_from_dynamic_vertex_buffer*(
-    _handle: bgfx_dynamic_vertex_buffer_handle_t; _startVertex: uint32;
-    _num: uint32) {.cdecl, importc: "bgfx_set_instance_data_from_dynamic_vertex_buffer",
+    handle: bgfx_dynamic_vertex_buffer_handle_t; startVertex: uint32;
+    num: uint32) {.cdecl, importc: "bgfx_set_instance_data_from_dynamic_vertex_buffer",
                     dynlib: bgfxdll.}
 ## *
 ##  Set number of instances for auto generated instances use in conjunction
@@ -3494,15 +3490,15 @@ proc bgfx_set_instance_data_from_dynamic_vertex_buffer*(
 ##
 ##
 
-proc bgfx_set_instance_count*(_numInstances: uint32) {.cdecl,
+proc bgfx_set_instance_count*(numInstances: uint32) {.cdecl,
     importc: "bgfx_set_instance_count", dynlib: bgfxdll.}
 ## *
 ##  Set texture stage for draw primitive.
 ##
-##  @param[in] _stage Texture unit.
-##  @param[in] _sampler Program sampler.
-##  @param[in] _handle Texture handle.
-##  @param[in] _flags Texture sampling mode. Default value UINT32_MAX uses
+##  @param[in] stage Texture unit.
+##  @param[in] sampler Program sampler.
+##  @param[in] handle Texture handle.
+##  @param[in] flags Texture sampling mode. Default value UINT32_MAX uses
 ##     texture sampling settings from the texture.
 ##     - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap
 ##       mode.
@@ -3511,8 +3507,8 @@ proc bgfx_set_instance_count*(_numInstances: uint32) {.cdecl,
 ##
 ##
 
-proc bgfx_set_texture*(_stage: uint8; _sampler: bgfx_uniform_handle_t;
-                      _handle: bgfx_texture_handle_t; _flags: uint32) {.cdecl,
+proc bgfx_set_texture*(stage: uint8; sampler: bgfx_uniform_handle_t;
+                      handle: bgfx_texture_handle_t; flags: uint32) {.cdecl,
     importc: "bgfx_set_texture", dynlib: bgfxdll.}
 ## *
 ##  Submit an empty primitive for rendering. Uniforms and draw state
@@ -3520,64 +3516,64 @@ proc bgfx_set_texture*(_stage: uint8; _sampler: bgfx_uniform_handle_t;
 ##  @remark
 ##    These empty draw calls will sort before ordinary draw calls.
 ##
-##  @param[in] _id View id.
+##  @param[in] id View id.
 ##
 ##
 
-proc bgfx_touch*(_id: bgfx_view_id_t) {.cdecl, importc: "bgfx_touch", dynlib: bgfxdll.}
+proc bgfx_touch*(id: bgfx_view_id_t) {.cdecl, importc: "bgfx_touch", dynlib: bgfxdll.}
 ## *
 ##  Submit primitive for rendering.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Program.
-##  @param[in] _depth Depth for sorting.
-##  @param[in] _flags Which states to discard for next draw. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Program.
+##  @param[in] depth Depth for sorting.
+##  @param[in] flags Which states to discard for next draw. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_submit*(_id: bgfx_view_id_t; _program: bgfx_program_handle_t;
-                 _depth: uint32; _flags: uint8) {.cdecl, importc: "bgfx_submit",
+proc bgfx_submit*(id: bgfx_view_id_t; program: bgfx_program_handle_t;
+                 depth: uint32; flags: uint8) {.cdecl, importc: "bgfx_submit",
     dynlib: bgfxdll.}
 ## *
 ##  Submit primitive with occlusion query for rendering.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Program.
-##  @param[in] _occlusionQuery Occlusion query.
-##  @param[in] _depth Depth for sorting.
-##  @param[in] _flags Which states to discard for next draw. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Program.
+##  @param[in] occlusionQuery Occlusion query.
+##  @param[in] depth Depth for sorting.
+##  @param[in] flags Which states to discard for next draw. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_submit_occlusion_query*(_id: bgfx_view_id_t;
-                                 _program: bgfx_program_handle_t; _occlusionQuery: bgfx_occlusion_query_handle_t;
-                                 _depth: uint32; _flags: uint8) {.cdecl,
+proc bgfx_submit_occlusion_query*(id: bgfx_view_id_t;
+                                 program: bgfx_program_handle_t; occlusionQuery: bgfx_occlusion_query_handle_t;
+                                 depth: uint32; flags: uint8) {.cdecl,
     importc: "bgfx_submit_occlusion_query", dynlib: bgfxdll.}
 ## *
 ##  Submit primitive for rendering with index and instance data info from
 ##  indirect buffer.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Program.
-##  @param[in] _indirectHandle Indirect buffer.
-##  @param[in] _start First element in indirect buffer.
-##  @param[in] _num Number of dispatches.
-##  @param[in] _depth Depth for sorting.
-##  @param[in] _flags Which states to discard for next draw. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Program.
+##  @param[in] indirectHandle Indirect buffer.
+##  @param[in] start First element in indirect buffer.
+##  @param[in] num Number of dispatches.
+##  @param[in] depth Depth for sorting.
+##  @param[in] flags Which states to discard for next draw. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_submit_indirect*(_id: bgfx_view_id_t; _program: bgfx_program_handle_t;
-                          _indirectHandle: bgfx_indirect_buffer_handle_t;
-                          _start: uint16; _num: uint16; _depth: uint32;
-                          _flags: uint8) {.cdecl,
+proc bgfx_submit_indirect*(id: bgfx_view_id_t; program: bgfx_program_handle_t;
+                          indirectHandle: bgfx_indirect_buffer_handle_t;
+                          start: uint16; num: uint16; depth: uint32;
+                          flags: uint8) {.cdecl,
     importc: "bgfx_submit_indirect", dynlib: bgfxdll.}
 ## *
 ##  Set compute index buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Index buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Index buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
@@ -3588,138 +3584,138 @@ proc bgfx_set_compute_index_buffer*(_stage: uint8;
 ## *
 ##  Set compute vertex buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Vertex buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Vertex buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_set_compute_vertex_buffer*(_stage: uint8;
-                                    _handle: bgfx_vertex_buffer_handle_t;
-                                    _access: bgfx_access_t) {.cdecl,
+proc bgfx_set_compute_vertex_buffer*(stage: uint8;
+                                    handle: bgfx_vertex_buffer_handle_t;
+                                    access: bgfx_access_t) {.cdecl,
     importc: "bgfx_set_compute_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute dynamic index buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Dynamic index buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Dynamic index buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_set_compute_dynamic_index_buffer*(_stage: uint8;
-    _handle: bgfx_dynamic_index_buffer_handle_t; _access: bgfx_access_t) {.cdecl,
+proc bgfx_set_compute_dynamic_index_buffer*(stage: uint8;
+    handle: bgfx_dynamic_index_buffer_handle_t; access: bgfx_access_t) {.cdecl,
     importc: "bgfx_set_compute_dynamic_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute dynamic vertex buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Dynamic vertex buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Dynamic vertex buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_set_compute_dynamic_vertex_buffer*(_stage: uint8;
-    _handle: bgfx_dynamic_vertex_buffer_handle_t; _access: bgfx_access_t) {.cdecl,
+proc bgfx_set_compute_dynamic_vertex_buffer*(stage: uint8;
+    handle: bgfx_dynamic_vertex_buffer_handle_t; access: bgfx_access_t) {.cdecl,
     importc: "bgfx_set_compute_dynamic_vertex_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute indirect buffer.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Indirect buffer handle.
-##  @param[in] _access Buffer access. See `Access::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Indirect buffer handle.
+##  @param[in] access Buffer access. See `Access::Enum`.
 ##
 ##
 
-proc bgfx_set_compute_indirect_buffer*(_stage: uint8;
-                                      _handle: bgfx_indirect_buffer_handle_t;
-                                      _access: bgfx_access_t) {.cdecl,
+proc bgfx_set_compute_indirect_buffer*(stage: uint8;
+                                      handle: bgfx_indirect_buffer_handle_t;
+                                      access: bgfx_access_t) {.cdecl,
     importc: "bgfx_set_compute_indirect_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute image from texture.
 ##
-##  @param[in] _stage Compute stage.
-##  @param[in] _handle Texture handle.
-##  @param[in] _mip Mip level.
-##  @param[in] _access Image access. See `Access::Enum`.
-##  @param[in] _format Texture format. See: `TextureFormat::Enum`.
+##  @param[in] stage Compute stage.
+##  @param[in] handle Texture handle.
+##  @param[in] mip Mip level.
+##  @param[in] access Image access. See `Access::Enum`.
+##  @param[in] format Texture format. See: `TextureFormat::Enum`.
 ##
 ##
 
-proc bgfx_set_image*(_stage: uint8; _handle: bgfx_texture_handle_t; _mip: uint8;
-                    _access: bgfx_access_t; _format: bgfx_texture_format_t) {.cdecl,
+proc bgfx_set_image*(stage: uint8; handle: bgfx_texture_handle_t; mip: uint8;
+                    access: bgfx_access_t; format: bgfx_texture_format_t) {.cdecl,
     importc: "bgfx_set_image", dynlib: bgfxdll.}
 ## *
 ##  Dispatch compute.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Compute program.
-##  @param[in] _numX Number of groups X.
-##  @param[in] _numY Number of groups Y.
-##  @param[in] _numZ Number of groups Z.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Compute program.
+##  @param[in] numX Number of groups X.
+##  @param[in] numY Number of groups Y.
+##  @param[in] numZ Number of groups Z.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_dispatch*(_id: bgfx_view_id_t; _program: bgfx_program_handle_t;
-                   _numX: uint32; _numY: uint32; _numZ: uint32; _flags: uint8) {.
+proc bgfx_dispatch*(id: bgfx_view_id_t; program: bgfx_program_handle_t;
+                   numX: uint32; numY: uint32; numZ: uint32; flags: uint8) {.
     cdecl, importc: "bgfx_dispatch", dynlib: bgfxdll.}
 ## *
 ##  Dispatch compute indirect.
 ##
-##  @param[in] _id View id.
-##  @param[in] _program Compute program.
-##  @param[in] _indirectHandle Indirect buffer.
-##  @param[in] _start First element in indirect buffer.
-##  @param[in] _num Number of dispatches.
-##  @param[in] _flags Discard or preserve states. See `BGFX_DISCARD_*`.
+##  @param[in] id View id.
+##  @param[in] program Compute program.
+##  @param[in] indirectHandle Indirect buffer.
+##  @param[in] start First element in indirect buffer.
+##  @param[in] num Number of dispatches.
+##  @param[in] flags Discard or preserve states. See `BGFX_DISCARD_*`.
 ##
 ##
 
-proc bgfx_dispatch_indirect*(_id: bgfx_view_id_t; _program: bgfx_program_handle_t;
-                            _indirectHandle: bgfx_indirect_buffer_handle_t;
-                            _start: uint16; _num: uint16; _flags: uint8) {.
+proc bgfx_dispatch_indirect*(id: bgfx_view_id_t; program: bgfx_program_handle_t;
+                            indirectHandle: bgfx_indirect_buffer_handle_t;
+                            start: uint16; num: uint16; flags: uint8) {.
     cdecl, importc: "bgfx_dispatch_indirect", dynlib: bgfxdll.}
 ## *
 ##  Discard previously set state for draw or compute call.
 ##
-##  @param[in] _flags Draw/compute states to discard.
+##  @param[in] flags Draw/compute states to discard.
 ##
 ##
 
-proc bgfx_discard*(_flags: uint8) {.cdecl, importc: "bgfx_discard", dynlib: bgfxdll.}
+proc bgfx_discard*(flags: uint8) {.cdecl, importc: "bgfx_discard", dynlib: bgfxdll.}
 ## *
 ##  Blit 2D texture region between two 2D textures.
 ##  @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 ##  @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 ##
-##  @param[in] _id View id.
-##  @param[in] _dst Destination texture handle.
-##  @param[in] _dstMip Destination texture mip level.
-##  @param[in] _dstX Destination texture X position.
-##  @param[in] _dstY Destination texture Y position.
-##  @param[in] _dstZ If texture is 2D this argument should be 0. If destination texture is cube
+##  @param[in] id View id.
+##  @param[in] dst Destination texture handle.
+##  @param[in] dstMip Destination texture mip level.
+##  @param[in] dstX Destination texture X position.
+##  @param[in] dstY Destination texture Y position.
+##  @param[in] dstZ If texture is 2D this argument should be 0. If destination texture is cube
 ##   this argument represents destination texture cube face. For 3D texture this argument
 ##   represents destination texture Z position.
-##  @param[in] _src Source texture handle.
-##  @param[in] _srcMip Source texture mip level.
-##  @param[in] _srcX Source texture X position.
-##  @param[in] _srcY Source texture Y position.
-##  @param[in] _srcZ If texture is 2D this argument should be 0. If source texture is cube
+##  @param[in] src Source texture handle.
+##  @param[in] srcMip Source texture mip level.
+##  @param[in] srcX Source texture X position.
+##  @param[in] srcY Source texture Y position.
+##  @param[in] srcZ If texture is 2D this argument should be 0. If source texture is cube
 ##   this argument represents source texture cube face. For 3D texture this argument
 ##   represents source texture Z position.
-##  @param[in] _width Width of region.
-##  @param[in] _height Height of region.
-##  @param[in] _depth If texture is 3D this argument represents depth of region, otherwise it's
+##  @param[in] width Width of region.
+##  @param[in] height Height of region.
+##  @param[in] depth If texture is 3D this argument represents depth of region, otherwise it's
 ##   unused.
 ##
 ##
 
-proc bgfx_blit*(_id: bgfx_view_id_t; _dst: bgfx_texture_handle_t; _dstMip: uint8;
-               _dstX: uint16; _dstY: uint16; _dstZ: uint16;
-               _src: bgfx_texture_handle_t; _srcMip: uint8; _srcX: uint16;
-               _srcY: uint16; _srcZ: uint16; _width: uint16; _height: uint16;
-               _depth: uint16) {.cdecl, importc: "bgfx_blit", dynlib: bgfxdll.}
+proc bgfx_blit*(id: bgfx_view_id_t; dst: bgfx_texture_handle_t; dstMip: uint8;
+               dstX: uint16; dstY: uint16; dstZ: uint16;
+               src: bgfx_texture_handle_t; srcMip: uint8; srcX: uint16;
+               srcY: uint16; srcZ: uint16; width: uint16; height: uint16;
+               depth: uint16) {.cdecl, importc: "bgfx_blit", dynlib: bgfxdll.}
 
 type
   bgfx_function_id_t* {.size: sizeof(cint).} = enum
@@ -3854,4 +3850,3 @@ type
     BGFX_FUNCTION_ID_SET_COMPUTE_INDIRECT_BUFFER, BGFX_FUNCTION_ID_SET_IMAGE,
     BGFX_FUNCTION_ID_DISPATCH, BGFX_FUNCTION_ID_DISPATCH_INDIRECT,
     BGFX_FUNCTION_ID_DISCARD, BGFX_FUNCTION_ID_BLIT, BGFX_FUNCTION_ID_COUNT
-
