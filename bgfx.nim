@@ -6,7 +6,7 @@
 ##  https://gist.github.com/bkaradzic/05a1c86a6dd57bf86e2d828878e88dc2#bgfx-is-switching-to-idl-to-generate-api
 ##
 ##
-type va_list* {.importc,header:"<stdarg.h>".} = object
+type va_list* {.importc,header:"<stdarg.h>".} = pointer
 
 {.deadCodeElim: on.}
 when defined(windows):
@@ -18,8 +18,6 @@ elif defined(macosx):
 else:
   const
     bgfxdll* = "bgfx-shared-libRelease.so"
-import
-  defines
 
 ## *
 ##  Fatal error enum.
