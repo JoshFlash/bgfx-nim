@@ -2238,7 +2238,7 @@ proc bgfx_destroy_frame_buffer*(handle: bgfx_frame_buffer_handle_t) {.cdecl,
 ##
 ##
 
-proc bgfx_create_uniform*(_name: cstring; _type: bgfx_uniform_type_t; _num: uint16): bgfx_uniform_handle_t {.
+proc bgfx_create_uniform*(name: cstring; `type`: bgfx_uniform_type_t; num: uint16): bgfx_uniform_handle_t {.
     cdecl, importc: "bgfx_create_uniform", dynlib: bgfxdll.}
 ## *
 ##  Retrieve uniform info.
@@ -3575,9 +3575,9 @@ proc bgfx_submit_indirect*(id: bgfx_view_id_t; program: bgfx_program_handle_t;
 ##
 ##
 
-proc bgfx_set_compute_index_buffer*(_stage: uint8;
-                                   _handle: bgfx_index_buffer_handle_t;
-                                   _access: bgfx_access_t) {.cdecl,
+proc bgfx_set_compute_index_buffer*(stage: uint8;
+                                   handle: bgfx_index_buffer_handle_t;
+                                   access: bgfx_access_t) {.cdecl,
     importc: "bgfx_set_compute_index_buffer", dynlib: bgfxdll.}
 ## *
 ##  Set compute vertex buffer.
