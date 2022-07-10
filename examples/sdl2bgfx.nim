@@ -10,13 +10,13 @@ when defined(macosx):
 
 when defined(linux):
   import 
-    x, 
-    xlib
+    x11/x, 
+    x11/xlib
 
   type
     SysWMmsgX11Obj* = object  ## when defined(SDL_VIDEO_DRIVER_X11)
-      display*: ptr xlib.TXDisplay  ##  The X11 display
-      window*: ptr x.TWindow            ##  The X11 window
+      display*: ptr xlib.XDisplay  ##  The X11 display
+      window*: ptr x.Window            ##  The X11 window
 
     SysWMInfoKindObj* = object ## when defined(SDL_VIDEO_DRIVER_X11)
       x11*: SysWMMsgX11Obj

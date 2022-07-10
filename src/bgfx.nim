@@ -17,10 +17,10 @@ when defined(windows):
     bgfxdll* = "lib-bgfx/bgfx-shared-libRelease.dll"
 elif defined(macosx):
   const
-    bgfxdll* = "lib-bgfx/bgfx-shared-libRelease.dylib"
+    bgfxdll* = "lib-bgfx/libbgfx-shared-libRelease.dylib"
 else:
   const
-    bgfxdll* = "lib-bgfx/bgfx-shared-libRelease.so"
+    bgfxdll* = "lib-bgfx/libbgfx-shared-libRelease.so"
 
 ## *
 ##  Fatal error enum.
