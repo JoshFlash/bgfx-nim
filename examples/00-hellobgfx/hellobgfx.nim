@@ -1,5 +1,5 @@
 #[
-  Much of this file's logic is derived from Zachary Carter's bgfx.nim Hello World example which can be found at
+  Portions of code were derived from Zachary Carter's bgfx.nim Hello World example which can be found at
   https://github.com/zacharycarter/bgfx.nim/tree/master/examples/00-HelloWorld
 
   version       = "0.1.0"
