@@ -82,7 +82,7 @@ proc linkSDL2BGFX (window: WindowPtr) =
     pd.context = nil
     bgfx_set_platform_data(addr pd)
 
-proc createGameWindow* (width: cint, height: cint, title: string) : WindowPtr =  
+proc createGameWindow* (width: cint, height: cint, title: string) : WindowPtr {.discardable} =  
 
   let sdlFailInit = not sdl2.init(INIT_TIMER or INIT_VIDEO or INIT_JOYSTICK or INIT_HAPTIC or INIT_GAMECONTROLLER or INIT_EVENTS)
   sdlFailIf sdlFailInit: "failed to initialize sdl2"

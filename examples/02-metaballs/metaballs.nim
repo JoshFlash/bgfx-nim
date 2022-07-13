@@ -9,7 +9,7 @@
 ]#
 
 import 
-  glm, std/math, tables,
+  vmath, std/math, tables,
   bgfx, sdl2, ../sdl2bgfx,
   vs_metaballs, fs_metaballs
 
@@ -17,22 +17,22 @@ const kMaxDims: int = 32
 const kMaxDimsF*: cfloat = float(kMaxDims)
 
 type 
-  PosNormalColorVertex = object
-    position: glm.Vec3
-    normal: glm.Vec3
-    color: glm.Vec3
+  PosNormalColorVertex = ref object
+    position: vmath.Vec3
+    normal: vmath.Vec3
+    color: vmath.Vec3
   Grid = ref object
     val: float32
-    normal: glm.Vec3
-  ExampleMetaball = ref object
+    normal: vmath.Vec3
+  Metaball = ref object
     width*: uint32
     height*: uint32
     reset*: uint32
     program*: bgfx.bgfx_program_handle_t
     grid*: array[kMaxDims*kMaxDims*kMaxDims, Grid]
     ticksOffset*: uint32
-var
-  vertexLayout: bgfx_vertex_layout_t
+  GameWindow = ref object
+    width, height: int
 
 ##
 ##  Copyright 2011-2022 Branimir Karadzic. All rights reserved.
@@ -41,6 +41,8 @@ var
 ##  Reference(s):
 ##  - Polygonising a scalar field
 ##    https://web.archive.org/web/20181127124338/http://paulbourke.net/geometry/polygonise/
+
+var gameWindow: GameWindow
 
 var s_edges*: array[0 .. 255, uint16] =
                                  [0x000'u16, 0x109'u16, 0x203'u16, 0x30a'u16, 0x406'u16, 0x50f'u16, 0x605'u16,
@@ -344,90 +346,91 @@ var s_cube*: array[8, array[3, cfloat]] =
                                      [0.0f, 0.0f, 1.0f], [1.0f, 0.0f, 1.0f],
                                      [1.0f, 0.0f, 0.0f], [0.0f, 0.0f, 0.0f]]
 
-proc vertLerp*(res: var Vec3; iso: cfloat; idx0: int; v0: cfloat; idx1: int; v1: cfloat): cfloat =
-  var edge0 = s_cube[idx0]
-  var edge1 = s_cube[idx1]
+proc vertLerp(vertices: var Vec3, iso: float32, idx0: uint32, v0: float32, idx1: uint32, v1: float32): float32 =
+    let edge0 = s_cube[idx0]
+    let edge1 = s_cube[idx1]
 
-  if (abs(iso - v1) < 0.00001):
-    res[0] = edge1[0]
-    res[1] = edge1[1]
-    res[2] = edge1[2]
-    return 1.0f
+    const c_epsilon = 1e-05
 
-  if (abs(iso - v0) < 0.00001 or abs(v0 - v1) < 0.00001):
-    res[0] = edge0[0]
-    res[1] = edge0[1]
-    res[2] = edge0[2]
-    return 0.0f
+    if abs(iso-v1) < c_epsilon:
+        vertices[0] = edge1[0]
+        vertices[1] = edge1[1]
+        vertices[2] = edge1[2]
+        return 1.0'f32
 
-  let lerp: float = (iso - v0) / (v1 - v0)
-  res[0] = edge0[0] + lerp * (edge1[0] - edge0[0])
-  res[1] = edge0[1] + lerp * (edge1[1] - edge0[1])
-  res[2] = edge0[2] + lerp * (edge1[2] - edge0[2])
-  return lerp
+    if abs(iso-v0) < c_epsilon or abs(v0-v1) < c_epsilon:
+        vertices[0] = edge0[0]
+        vertices[1] = edge0[1]
+        vertices[2] = edge0[2]
+        return 0.0'f32
 
-proc triangulate*(res: var Vec3; stride: int; rgb: ptr cfloat; xyz: ptr cfloat; val: array[8, ptr Grid]; iso: cfloat; scale: cfloat): int =
-  var cubeindex: int = 0
-  cubeindex = cubeindex or (if (val[0].m_val < iso): 0x01 else: 0)
-  cubeindex = cubeindex or (if (val[1].m_val < iso): 0x02 else: 0)
-  cubeindex = cubeindex or (if (val[2].m_val < iso): 0x04 else: 0)
-  cubeindex = cubeindex or (if (val[3].m_val < iso): 0x08 else: 0)
-  cubeindex = cubeindex or (if (val[4].m_val < iso): 0x10 else: 0)
-  cubeindex = cubeindex or (if (val[5].m_val < iso): 0x20 else: 0)
-  cubeindex = cubeindex or (if (val[6].m_val < iso): 0x40 else: 0)
-  cubeindex = cubeindex or (if (val[7].m_val < iso): 0x80 else: 0)
+    let lerp = (iso-v0)/(v1-v0)
+    vertices[0] = edge0[0]+lerp*(edge1[0]-edge0[0])
+    vertices[1] = edge0[1]+lerp*(edge1[1]-edge0[1])
+    vertices[2] = edge0[2]+lerp*(edge1[2]-edge0[2])
+    return lerp
 
-  if 0 == s_edges[cubeindex]:
-    return 0
-  var verts: array[12, array[6, cfloat]]
-  var flags = s_edges[cubeindex]
-  var ii = 0
-  while ii < 12:
-    if flags and (1 shl ii):
-      var idx0 = ii and 7
-      var idx1 = "\x01\x02\x03\x00\x05\x06\a\x04\x04\x05\x06\a"[ii]
-      var vertex: ptr cfloat = verts[ii]
-      var lerp: cfloat = vertLerp(vertex, iso, idx0, val[idx0].m_val, idx1,
-                              val[idx1].m_val)
-      var na: ptr cfloat = val[idx0].m_normal
-      var nb: ptr cfloat = val[idx1].m_normal
-      vertex[3] = na[0] + lerp * (nb[0] - na[0])
-      vertex[4] = na[1] + lerp * (nb[1] - na[1])
-      vertex[5] = na[2] + lerp * (nb[2] - na[2])
-    inc(ii)
-  var dr: cfloat = rgb[3] - rgb[0]
-  var dg: cfloat = rgb[4] - rgb[1]
-  var db: cfloat = rgb[5] - rgb[2]
-  var num = 0
-  var indices = s_indices[cubeindex]
-  var ii = 0
-  while indices[ii] != -1:
-    var vertex: ptr cfloat = verts[(indices[ii])]
-    var xyz: ptr cfloat = cast[ptr cfloat](result)
-    xyz[0] = xyz[0] + vertex[0] * scale
-    xyz[1] = xyz[1] + vertex[1] * scale
-    xyz[2] = xyz[2] + vertex[2] * scale
-    xyz[3] = vertex[3] * scale
-    xyz[4] = vertex[4] * scale
-    xyz[5] = vertex[5] * scale
-    var rr = ((rgb[0] + vertex[0] * dr) * 255.0f)
-    var gg = ((rgb[1] + vertex[1] * dg) * 255.0f)
-    var bb = ((rgb[2] + vertex[2] * db) * 255.0f)
-    var abgr = cast[ptr uint32](addr(result[24]))
-    abgr[] = 0xff000000 or (bb shl 16) or (gg shl 8) or rr
-    inc(result, stride)
-    inc(num)
-    inc(ii)
-  return num
+proc triangulate*(vert_result: var ptr PosNormalColorVertex; stride: int; rgb: array[6, float32];
+                  xyz: Vec3; val: array[8, ptr Grid]; iso: float32): uint32 =
+    var cubeindex: uint8 = 0
+    cubeindex = cubeindex or (if (val[0].val < iso): 0x00000001 else: 0)
+    cubeindex = cubeindex or (if (val[1].val < iso): 0x00000002 else: 0)
+    cubeindex = cubeindex or (if (val[2].val < iso): 0x00000004 else: 0)
+    cubeindex = cubeindex or (if (val[3].val < iso): 0x00000008 else: 0)
+    cubeindex = cubeindex or (if (val[4].val < iso): 0x00000010 else: 0)
+    cubeindex = cubeindex or (if (val[5].val < iso): 0x00000020 else: 0)
+    cubeindex = cubeindex or (if (val[6].val < iso): 0x00000040 else: 0)
+    cubeindex = cubeindex or (if (val[7].val < iso): 0x00000080 else: 0)
+    if 0'u16 == s_edges[cubeindex]:
+        return 0
+    var verts: array[12, array[2, Vec3]]
+    let flags: uint16 = s_edges[cubeindex]
+    var ii: uint16 = 0'u16
+    while ii < 12'u16:
+        if (flags and (1'u16 shl ii)) == 1:
+            let idx0: uint32 = ii and 7
+            let idx1: uint32 = [
+                0x00000001'u32, 0x00000002'u32, 0x00000003'u32, 0x00000000'u32,
+                0x00000005'u32, 0x00000006'u32, 0x00000007'u32, 0x00000004'u32,
+                0x00000004'u32, 0x00000005'u32, 0x00000006'u32, 0x00000007'u32][ii]
+            let lerp: float32 = vertLerp(verts[ii][0], iso, idx0, val[idx0].val, idx1,
+                                        val[idx1].val)
+            let na: Vec3 = val[idx0].normal
+            let nb: Vec3 = val[idx1].normal
+            verts[ii][1][0] = na[0]+lerp*(nb[0]-na[0])
+            verts[ii][1][1] = na[1]+lerp*(nb[1]-na[1])
+            verts[ii][1][2] = na[2]+lerp*(nb[2]-na[2])
+        ii = ii+1
+    let dr: float32 = rgb[3]-rgb[0]
+    let dg: float32 = rgb[4]-rgb[1]
+    let db: float32 = rgb[5]-rgb[2]
+    var num: uint32 = 0
+    let indices: array[16, int] = s_indices[cubeindex]
+    ii = 0'u16
+    while indices[ii] != -1'i8:
+        let vertex = verts[indices[ii]]
+        vert_result.position[0] = xyz[0]+vertex[0][0]
+        vert_result.position[1] = xyz[1]+vertex[0][1]
+        vert_result.position[2] = xyz[2]+vertex[0][2]
+        vert_result.normal[0] = vertex[1][0]
+        vert_result.normal[1] = vertex[1][1]
+        vert_result.normal[2] = vertex[1][2]
+        vert_result.color[0] = 0xff
+        vert_result.color[1] = ((rgb[2]+vertex[0][2]*db)*255.0)
+        vert_result.color[2] = ((rgb[1]+vertex[0][1]*dg)*255.0)
+        vert_result.color[3] = ((rgb[0]+vertex[0][0]*dr)*255.0)
+        vert_result = cast[ptr PosNormalColorVertex](cast[ByteAddress](vert_result)+stride)
+        num = num+1
+        ii = ii+1
+    return num
 
-proc init*(argc: int32; argv: cstringArray; width: cint; height: cint) =
-  let gameWindow = sdl2bgfx.createGameWindow(width, height, "HelloBGFX")
+proc init*(width: cint; height: cint) =
+  sdl2bgfx.createGameWindow(width, height, "Metaballs")
+  gameWindow = GameWindow(width: width.int, height: height.int)
   bgfx_set_view_clear(0, BGFX_CLEAR_COLOR or BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0)
 
 proc shutdown*(): cint =
   bgfx_shutdown()
-
-var metaballVertexLayout: ptr bgfx_vertex_layout_t
 
 proc toMemory*(data: var seq[uint8]): ptr bgfx_memory_t = 
     var size = data.len()
@@ -436,6 +439,7 @@ proc toMemory*(data: var seq[uint8]): ptr bgfx_memory_t =
     cast[ptr uint8](cast[int](mem.data) + cast[int](size))[] = cast[uint8]('\0')
     return mem 
 
+#todo fix this
 proc createShader(platform: string, shaderType: string): bgfx_shader_handle_t =
   var shaderMem: ptr bgfx_memory_t
   case shaderType
@@ -447,8 +451,10 @@ proc createShader(platform: string, shaderType: string): bgfx_shader_handle_t =
     shaderMem = toMemory(shaderData)
   bgfx_create_shader(shaderMem)
 
-proc start(mb: ExampleMetaball) =
-
+var metaballVertexLayout: ptr bgfx_vertex_layout_t
+proc start(mb: Metaball) =
+  var mbVertLayout: bgfx_vertex_layout_t
+  metaballVertexLayout = addr mbVertLayout
   let rendererType = bgfx_get_renderer_type()
   let layoutHandle = bgfx_create_vertex_layout(metaballVertexLayout)  
   discard metaballVertexLayout.bgfx_vertex_layout_begin(rendererType)
@@ -485,7 +491,7 @@ proc cleanUp(program: bgfx_program_handle_t) =
   bgfx_destroy_program(program)
   bgfx_shutdown()
 
-proc update(mb: ExampleMetaball) =
+proc update(mb: Metaball) =
     const y_pitch = kMaxDims
     const z_pitch = kMaxDims*kMaxDims
     const inv_dim = 1.0'f32/kMaxDimsF-1
@@ -505,12 +511,15 @@ proc update(mb: ExampleMetaball) =
     bgfx_dbg_text_clear(0, false)
     bgfx_dbg_text_printf(1, 1, 0x4f, "examples/02-metaballs")
 
-    block:
-      var view = mat4(0.0)
-      # vmath.lookAt(view, eye, at) TODO: this
-      # var proj: Mat4
-      # math.mtxProj(proj, 60.0'f32, cast[float32](self.m_window_width)/cast[float32](self.m_window_height), 0.1'f32, 100.0'f32)
-      # bgfx.SetViewTransform(0, unsafeAddr(view[0]), unsafeAddr(proj[0]))
+    const center: Vec3  = vec3(0.0'f32, 0.0'f32,   0.0'f32)
+    const eye: Vec3 = vec3(0.0'f32, 0.0'f32, -50.0'f32)
+    const up: Vec3 = vec3(0.0'f32, 1.0'f32, 0.0'f32)
+
+    var idx: bgfx_view_id_t = 0'u16
+    var view = vmath.lookAt(eye, center, up) 
+    var proj: Mat4
+    # math.mtxProj(proj, 60.0'f32, cast[float32](gameWindow.width)/cast[float32](gameWindow.height), 0.1'f32, 100.0'f32) todo : projection matrix
+    bgfx_set_view_transform(idx, addr view, addr proj)
 
     bgfx_touch(0)
 
@@ -524,7 +533,7 @@ proc update(mb: ExampleMetaball) =
     bgfx_alloc_transient_vertex_buffer(addr tvb, max_vertices, metaballVertexLayout)
 
     const num_spheres = 16
-    var sphere: array[num_spheres, Vec4[0'f32]]
+    var sphere: array[num_spheres, Vec4]
     var index = 0
     while index < num_spheres:
         let fii = float32(index)
@@ -562,7 +571,7 @@ proc update(mb: ExampleMetaball) =
                     dist = dist+prod
                     prod = prod*dot
                     index = index+1
-                mb.grid[offset + xx].value = (dist/prod) - 1.0'f32
+                mb.grid[offset + xx].val = (dist/prod) - 1.0'f32
                 xx = xx+1
             yy = yy+1
         zz = zz+1
@@ -578,58 +587,61 @@ proc update(mb: ExampleMetaball) =
             xx = 1
             let offset = (zz * kMaxDims + yy) * kMaxDims
             while xx < kMaxDims - 1:
-                let xoffset = offset+xx
-                let normal = [
-                    mb.grid[xoffset - 1  ].value - mb.grid[xoffset+1  ].value,
-                    mb.grid[xoffset - y_pitch].value - mb.grid[xoffset+y_pitch].value,
-                    mb.grid[xoffset - z_pitch].value - mb.grid[xoffset+z_pitch].value
-                ]
-                math.vec3Norm(self.m_grid[xoffset].normal, normal)
+                let xoffset = offset + xx
+                let normal = vec3(
+                    float32(mb.grid[xoffset - 1  ].val - mb.grid[xoffset+1  ].val),
+                    mb.grid[xoffset - y_pitch].val - mb.grid[xoffset+y_pitch].val,
+                    mb.grid[xoffset - z_pitch].val - mb.grid[xoffset+z_pitch].val
+                )
+                # normalize
+                var invLen: float32 = 1.0'f32 / length(normal)
+                mb.grid[xoffset].normal[0] = normal[0] * invLen
+                mb.grid[xoffset].normal[1] = normal[1] * invLen
+                mb.grid[xoffset].normal[2] = normal[2] * invLen
                 xx = xx+1
             yy = yy+1
         zz = zz+1
+    prof_normal = getTicks().float64 - prof_normal
 
-    prof_normal = GetTime()-prof_normal
-
-    prof_triangulate = GetTime()
+    prof_triangulate = getTicks().float64
 
     var current_pos = cast[ptr PosNormalColorVertex](tvb.data)
 
     zz = 0
-    while zz < DIMS-1 and num_vertices+12 < max_vertices:
+    while zz < kMaxDims-1 and num_vertices+12 < max_vertices:
         let fzz = float32(zz)
         var rgb: array[6, float32]
         rgb[2] = fzz*inv_dim
         rgb[5] = (fzz+1)*inv_dim
         yy = 0
-        while yy < DIMS-1 and num_vertices+12 < max_vertices:
+        while yy < kMaxDims-1 and num_vertices+12 < max_vertices:
             let fyy = float32(yy)
-            let offset = (zz*DIMS+yy)*DIMS
+            let offset = (zz*kMaxDims+yy)*kMaxDims
             rgb[1] = fyy*inv_dim
             rgb[4] = (fyy+1)*inv_dim
             xx = 0
-            while xx < DIMS-1 and num_vertices+12 < max_vertices:
+            while xx < kMaxDims-1 and num_vertices+12 < max_vertices:
                 let fxx = float32(xx)
                 let xoffset = offset+xx
                 rgb[0] = fxx*inv_dim
                 rgb[3] = (fxx+1'f32)*inv_dim
                 
-                const HFDIMS = -FDIMS*0.5'f32 # -16
-                let pos = [
+                const HFDIMS = -kMaxDimsF*0.5'f32 # -16
+                let pos: Vec3 = vec3(
                     HFDIMS+fxx,
                     HFDIMS+fyy,
                     HFDIMS+fzz
-                ]
+                )
 
                 let val = [
-                    addr(self.m_grid[xoffset+z_pitch+y_pitch]),
-                    addr(self.m_grid[xoffset+z_pitch+y_pitch+1]),
-                    addr(self.m_grid[xoffset+y_pitch+1]),
-                    addr(self.m_grid[xoffset+y_pitch]),
-                    addr(self.m_grid[xoffset+z_pitch]),
-                    addr(self.m_grid[xoffset+z_pitch+1]),
-                    addr(self.m_grid[xoffset+1]),
-                    addr(self.m_grid[xoffset])
+                    addr(mb.grid[xoffset+z_pitch+y_pitch]),
+                    addr(mb.grid[xoffset+z_pitch+y_pitch+1]),
+                    addr(mb.grid[xoffset+y_pitch+1]),
+                    addr(mb.grid[xoffset+y_pitch]),
+                    addr(mb.grid[xoffset+z_pitch]),
+                    addr(mb.grid[xoffset+z_pitch+1]),
+                    addr(mb.grid[xoffset+1]),
+                    addr(mb.grid[xoffset])
                 ]
                 let num = triangulate(current_pos, stride, rgb, pos, val, 0.5'f32)
                 current_pos = cast[ptr PosNormalColorVertex](cast[ByteAddress](current_pos)+int(num))
@@ -638,26 +650,46 @@ proc update(mb: ExampleMetaball) =
             yy = yy+1
         zz = zz+1
 
-    prof_triangulate = GetTime()-prof_triangulate
+    prof_triangulate = getTicks().float64 - prof_triangulate
 
-    var mtx: Mat4
-    fpumath.mtxIdentity(mtx)
-    fpumath.mtxRotateXY(mtx, time*0.67'f32, time)
+    var mtx: Mat4 = rotateZ(time.float32 * 0.67'f32)
+    discard bgfx_set_transform(addr mtx, 0'u16)
 
-    bgfx.SetTransform(addr(mtx[0]))
+    bgfx_set_transient_vertex_buffer(tvb.data[], addr tvb, 0'u32, uint32(num_vertices))
 
-    bgfx.SetVertexBuffer(addr(tvb), 0, uint32(num_vertices))
+    bgfx_set_state(BGFX_STATE_DEFAULT)
 
-    bgfx.SetState(BGFX_STATE_DEFAULT)
+    bgfx_submit(0, mb.program)
 
-    bgfx.Submit(0, self.m_program)
+    # bgfxDebugTextPrintf(1, 4, 0x0f, "Num vertices: %5d (%6.4f%%)", num_vertices, num_vertices.toFloat()/max_vertices.toFloat()*100)
+    # bgfxDebugTextPrintf(1, 5, 0x0f, "      Update: % 7.3f[ms]", prof_update*toMs)
+    # bgfxDebugTextPrintf(1, 6, 0x0f, "Calc Normals: % 7.3f[ms]", prof_normal*toMs)
+    # bgfxDebugTextPrintf(1, 7, 0x0f, " Triangulate: % 7.3f[ms]", prof_triangulate*toMs)
+    # bgfxDebugTextPrintf(1, 8, 0x0f, "       Frame: %7.3f[ms]", frameTime*toMs);
+    # bgfxDebugTextPrintf(1, 9, 0x0f, "         FPS: %7.3f", 1.0'f32/frameTime);
 
-    bgfx.DebugTextPrintf(1, 4, 0x0f, "Num vertices: %5d (%6.4f%%)", num_vertices, num_vertices.toFloat()/max_vertices.toFloat()*100)
-    bgfx.DebugTextPrintf(1, 5, 0x0f, "      Update: % 7.3f[ms]", prof_update*toMs)
-    bgfx.DebugTextPrintf(1, 6, 0x0f, "Calc Normals: % 7.3f[ms]", prof_normal*toMs)
-    bgfx.DebugTextPrintf(1, 7, 0x0f, " Triangulate: % 7.3f[ms]", prof_triangulate*toMs)
-    bgfx.DebugTextPrintf(1, 8, 0x0f, "       Frame: %7.3f[ms]", frameTime*toMs);
-    bgfx.DebugTextPrintf(1, 9, 0x0f, "         FPS: %7.3f", 1.0'f32/frameTime);
+    discard bgfx_frame(false)
 
-    bgfx.Frame()
+proc run() = 
+  defer: sdl2.quit()
+  var
+    event = sdl2.defaultEvent
+    runGame = true
+    mb: Metaball = Metaball()
+    
+  mb.start()
 
+  while runGame:
+    while pollEvent(event):
+      case event.kind
+      of QuitEvent:
+        runGame = false
+        break
+      else:
+        discard
+        # update(mb)
+  
+  cleanUp(mb.program)
+
+init(1600, 1000)
+run()
