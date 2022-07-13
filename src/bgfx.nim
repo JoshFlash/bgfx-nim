@@ -3203,7 +3203,7 @@ proc bgfx_set_marker*(marker: cstring) {.cdecl, importc: "bgfx_set_marker",
 ##
 ##
 
-proc bgfx_set_state*(state: uint64; rgba: uint32) {.cdecl,
+proc bgfx_set_state*(state: uint64; rgba: uint32 = 0'u32) {.cdecl,
     importc: "bgfx_set_state", dynlib: bgfxdll.}
 ## *
 ##  Set condition for rendering.
@@ -3533,7 +3533,7 @@ proc bgfx_touch*(id: bgfx_view_id_t) {.cdecl, importc: "bgfx_touch", dynlib: bgf
 ##
 
 proc bgfx_submit*(id: bgfx_view_id_t; program: bgfx_program_handle_t;
-                 depth: uint32; flags: uint8) {.cdecl, importc: "bgfx_submit",
+                 depth: uint32 = 0; flags: uint8 = BGFX_DISCARD_ALL) {.cdecl, importc: "bgfx_submit",
     dynlib: bgfxdll.}
 ## *
 ##  Submit primitive with occlusion query for rendering.
